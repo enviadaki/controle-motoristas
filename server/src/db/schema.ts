@@ -165,6 +165,42 @@ export const tabelaValores = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Lançamentos diários (Passo 1) — líder registra, por motorista e por dia, o
+// que rodou. Uma linha por (motorista, data); o valor da semana é calculado
+// a partir daqui + tabela_valores (ver lib/calculo.ts), nunca digitado à mão.
+// Modelo confirmado com o Rafael: valor fixo semanal (seg.–sáb., +domingo se
+// rodou), com desconto por pacote em insucesso (não é "tudo ou nada" por dia).
+// ---------------------------------------------------------------------------
+
+export const lancamentos = pgTable(
+  "lancamentos",
+  {
+    id: serial("id").primaryKey(),
+    motoristaId: integer("motorista_id")
+      .notNull()
+      .references(() => motoristas.id),
+    // Guardado junto (não só via motorista) pra manter a trava de líder e o
+    // histórico corretos mesmo se o motorista for movido de base depois.
+    baseId: integer("base_id")
+      .notNull()
+      .references(() => bases.id),
+    data: date("data").notNull(),
+    rodou: boolean("rodou").notNull().default(true), // trabalhou nesse dia?
+    pacotesEntregues: integer("pacotes_entregues").notNull().default(0),
+    pacotesInsucesso: integer("pacotes_insucesso").notNull().default(0), // gera desconto
+    paradasExtras: integer("paradas_extras").notNull().default(0),
+    resgates: integer("resgates").notNull().default(0), // meia rota / resgate
+    observacoes: text("observacoes"),
+    lancadoPorId: integer("lancado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("lancamentos_motorista_data_unique").on(t.motoristaId, t.data),
+    index("lancamentos_base_data_idx").on(t.baseId, t.data),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Auditoria centralizada — toda alteração relevante grava aqui
 // ---------------------------------------------------------------------------
 

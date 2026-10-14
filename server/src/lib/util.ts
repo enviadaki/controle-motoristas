@@ -38,6 +38,51 @@ export function validarNomeCompleto(nome: string): boolean {
   return palavras.length >= 2 && palavras.every((p) => PALAVRA_NOME.test(p));
 }
 
+// ---------------------------------------------------------------------------
+// Semana de trabalho (segunda a domingo). Tudo em data "calendário" (string
+// YYYY-MM-DD), calculado em UTC pra não sofrer de fuso/horário de verão.
+// ---------------------------------------------------------------------------
+
+function paraData(iso: string): Date {
+  const [a, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d));
+}
+function paraISO(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export interface InfoSemana {
+  inicio: string; // segunda
+  fim: string; // domingo
+}
+
+export function semanaDe(dataISO: string): InfoSemana {
+  const d = paraData(dataISO);
+  const diaSemana = d.getUTCDay(); // 0 = domingo .. 6 = sábado
+  const deslocSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+  const inicio = new Date(d);
+  inicio.setUTCDate(d.getUTCDate() + deslocSegunda);
+  const fim = new Date(inicio);
+  fim.setUTCDate(inicio.getUTCDate() + 6);
+  return { inicio: paraISO(inicio), fim: paraISO(fim) };
+}
+
+// "Hoje" no fuso da Bahia (America/Bahia) — é esse calendário que decide
+// qual semana está aberta pro líder, não o relógio UTC do servidor.
+export function hojeISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bahia" });
+}
+
+export function semanaAtual(): InfoSemana {
+  return semanaDe(hojeISO());
+}
+
+// A semana fecha sozinha ao virar a próxima: líder só lança/edita dias da
+// semana corrente. Admin/Financeiro podem corrigir semanas já fechadas.
+export function semanaFechada(dataISO: string): boolean {
+  return semanaDe(dataISO).inicio < semanaAtual().inicio;
+}
+
 export function validarCpf(cpf: string): boolean {
   if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
   const dv = (n: number) => {

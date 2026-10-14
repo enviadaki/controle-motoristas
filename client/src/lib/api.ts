@@ -119,6 +119,50 @@ export interface UsuarioAdmin extends Usuario {
   ultimoAcesso: string | null;
 }
 
+export interface Lancamento {
+  id: number;
+  motoristaId: number;
+  motoristaNome: string;
+  baseId: number;
+  baseCodigo: string;
+  data: string;
+  rodou: boolean;
+  pacotesEntregues: number;
+  pacotesInsucesso: number;
+  paradasExtras: number;
+  resgates: number;
+  observacoes: string | null;
+}
+
+export interface SemanaLancamentos {
+  semanaInicio: string;
+  semanaFim: string;
+  fechada: boolean;
+  itens: Lancamento[];
+}
+
+export interface ResumoSemana {
+  motoristaId: number;
+  semanaInicio: string;
+  semanaFim: string;
+  diasTrabalhados: number;
+  trabalhouDomingo: boolean;
+  pacotesEntregues: number;
+  pacotesInsucesso: number;
+  paradasExtras: number;
+  resgates: number;
+  tabelaValorId: number | null;
+  avisoValor: string | null;
+  valorRotaSemana: number;
+  valorRotaDomingo: number;
+  valorAdicional: number;
+  valorPacotesExtra: number;
+  valorParadasExtra: number;
+  valorResgates: number;
+  valorDescontoInsucesso: number;
+  valorTotal: number;
+}
+
 export interface RegistroAuditoria {
   id: number;
   usuarioNome: string | null;

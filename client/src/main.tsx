@@ -10,6 +10,7 @@ import { Carregando } from "./components/ui";
 import { Login } from "./pages/Login";
 import { Inicio } from "./pages/Inicio";
 import { Motoristas } from "./pages/Motoristas";
+import { Lancamentos } from "./pages/Lancamentos";
 import { Bases } from "./pages/Bases";
 import { TabelaValores } from "./pages/TabelaValores";
 import { Usuarios } from "./pages/Usuarios";
@@ -41,6 +42,7 @@ function Rotas() {
         }
       >
         <Route index element={<Inicio />} />
+        <Route path="lancamentos" element={<Lancamentos />} />
         <Route path="motoristas" element={<Motoristas />} />
         <Route path="tabela-valores" element={<TabelaValores />} />
         <Route path="bases" element={<Protegido perfis={["ADMIN"]}><Bases /></Protegido>} />

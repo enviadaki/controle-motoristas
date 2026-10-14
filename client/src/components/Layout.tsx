@@ -17,7 +17,7 @@ const MENU: { grupo: string; itens: ItemMenu[] }[] = [
   {
     grupo: "Operação",
     itens: [
-      { para: "/lancamentos", rotulo: "Lançamentos diários", icone: ClipboardList, emBreve: true },
+      { para: "/lancamentos", rotulo: "Lançamentos diários", icone: ClipboardList },
     ],
   },
   {

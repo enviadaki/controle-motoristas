@@ -11,7 +11,7 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 | Passo | Entrega | Situação |
 |---|---|---|
 | 0 | Base do sistema: login, perfis, bases, motoristas, tabela de valores, usuários, auditoria | ✅ pronto |
-| 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | — |
+| 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | ✅ pronto |
 | 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com evidência e parcelamento | — |
 | 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | — |
 | 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | — |
@@ -28,10 +28,22 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 
 Regras já aplicadas no servidor (não só na tela):
 - Líder só enxerga motoristas, bases e valores das bases vinculadas a ele.
-- Cadastro/edição de motorista: só Administrador e Financeiro (protege PIX e favorecido).
+- Cadastro/edição de motorista: Administrador, Financeiro e Líder (líder não mexe nos dados de pagamento, e o nome exige nome e sobrenome completos).
+- Lançamento diário: Administrador, Financeiro e Líder (só das bases dele); a semana fecha sozinha ao virar — líder só edita a semana corrente, Admin/Financeiro corrigem semanas fechadas.
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
+
+### Como funciona o cálculo do Passo 1
+
+Modelo "SAJ" (confirmado com o Rafael): o motorista recebe um **valor fixo pela semana** (segunda a
+sábado) se rodou pelo menos um dia, mais um valor extra se também rodou no domingo. Pacotes acima da
+média inclusa geram adicional por unidade; cada **pacote em insucesso desconta um valor fixo** (não é
+"tudo ou nada" por dia — o motorista não perde a rota por não completá-la, perde por pacote não entregue).
+Paradas extras e resgates também somam. Tudo isso vem da **tabela de valores**, casando base + tipo de
+veículo + rota padrão do motorista (campo "Rota padrão" no cadastro precisa bater com a "Cidade/rota" da
+tabela de valores); se não achar (ou achar mais de uma vigente) o sistema avisa em vez de calcular errado.
+Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) entram por fora.
 
 ## Stack
 

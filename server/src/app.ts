@@ -8,6 +8,7 @@ import { requireAuth, requirePerfil } from "./lib/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { basesRouter } from "./routes/bases.js";
 import { motoristasRouter } from "./routes/motoristas.js";
+import { lancamentosRouter } from "./routes/lancamentos.js";
 import { tabelaValoresRouter } from "./routes/tabela-valores.js";
 import { usuariosRouter } from "./routes/usuarios.js";
 import { auditoriaRouter } from "./routes/auditoria.js";
@@ -30,6 +31,7 @@ export function criarApp(opcoes: { pastaFrontend?: string } = {}) {
   app.use("/api/auth", authRouter);
   app.use("/api/bases", requireAuth, basesRouter);
   app.use("/api/motoristas", requireAuth, motoristasRouter);
+  app.use("/api/lancamentos", requireAuth, lancamentosRouter);
   app.use("/api/tabela-valores", requireAuth, tabelaValoresRouter);
   app.use("/api/usuarios", requireAuth, requirePerfil("ADMIN"), usuariosRouter);
   app.use("/api/auditoria", requireAuth, requirePerfil("ADMIN"), auditoriaRouter);
