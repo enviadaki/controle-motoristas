@@ -1,0 +1,11 @@
+packages:
+  - server
+  - client
+
+# Segurança (mesma regra do Sistema de Romaneios): só instala versões de
+# pacotes publicadas há pelo menos 1 dia — defesa contra pacotes maliciosos
+# que costumam ser removidos do npm em poucas horas.
+minimumReleaseAge: 1440
+
+onlyBuiltDependencies:
+  - esbuild

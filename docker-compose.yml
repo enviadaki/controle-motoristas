@@ -1,0 +1,57 @@
+name: controle-motoristas
+
+# Mesmo padrão das instâncias romaneio-app-prod e cadastro-app-prod:
+# Postgres e app numa rede interna; só o Nginx Proxy Manager publica portas
+# (80/443) e termina o SSL de controle-motoristas.enviadaki.com.br.
+# No NPM, o Proxy Host aponta para:  app : 5000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-controle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-controle_motoristas}
+      TZ: America/Bahia
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-controle} -d ${POSTGRES_DB:-controle_motoristas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL no .env}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      TZ: America/Bahia
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [interna, proxy]
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81" # painel do NPM — feche a porta 81 no Security Group depois de configurar
+    volumes:
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
+    networks: [proxy]
+
+networks:
+  interna:
+  proxy:
+
+volumes:
+  postgres-data:
+  npm-data:
+  npm-letsencrypt:

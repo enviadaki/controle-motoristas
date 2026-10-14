@@ -1,0 +1,35 @@
+{
+  "name": "server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts src/db/migrate.ts src/db/seed.ts --bundle --platform=node --format=esm --target=node22 --outdir=dist --sourcemap --banner:js=\"import{createRequire as __cr}from'module';const require=__cr(import.meta.url);\"",
+    "start": "node --enable-source-maps dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "drizzle-orm": "^0.44.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "esbuild": "^0.25.9",
+    "tsx": "^4.20.5",
+    "typescript": "~5.9.2"
+  }
+}

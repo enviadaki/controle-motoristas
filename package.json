@@ -1,0 +1,16 @@
+{
+  "name": "controle-motoristas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Controle de pagamento de motoristas da Envia Daki — lançamentos diários, descontos e fechamento",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm --filter ./client run build && pnpm --filter ./server run build",
+    "typecheck": "pnpm -r run typecheck",
+    "db:generate": "pnpm --filter ./server run db:generate",
+    "db:migrate": "pnpm --filter ./server run db:migrate",
+    "db:seed": "pnpm --filter ./server run db:seed",
+    "start": "pnpm --filter ./server run start"
+  }
+}
