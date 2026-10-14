@@ -12,7 +12,7 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 |---|---|---|
 | 0 | Base do sistema: login, perfis, bases, motoristas, tabela de valores, usuários, auditoria | ✅ pronto |
 | 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | ✅ pronto |
-| 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com evidência e parcelamento | — |
+| 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com parcelamento | ✅ pronto (evidência/anexo ainda não) |
 | 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | — |
 | 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | — |
 | 5 | (futuro) Integração via API com o DB Frete | — |
@@ -30,6 +30,7 @@ Regras já aplicadas no servidor (não só na tela):
 - Líder só enxerga motoristas, bases e valores das bases vinculadas a ele.
 - Cadastro/edição de motorista: Administrador, Financeiro e Líder (líder não mexe nos dados de pagamento, e o nome exige nome e sobrenome completos).
 - Lançamento diário: Administrador, Financeiro e Líder (só das bases dele); a semana fecha sozinha ao virar — líder só edita a semana corrente, Admin/Financeiro corrigem semanas fechadas.
+- Descontos de avaria/extravio: só Administrador e Descontos lançam/editam; Líder só visualiza (da própria base); Financeiro só muda o status (Devido/Pago/Contestado/Cancelado) ao conferir.
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
@@ -43,7 +44,9 @@ média inclusa geram adicional por unidade; cada **pacote em insucesso desconta 
 Paradas extras e resgates também somam. Tudo isso vem da **tabela de valores**, casando base + tipo de
 veículo + rota padrão do motorista (campo "Rota padrão" no cadastro precisa bater com a "Cidade/rota" da
 tabela de valores); se não achar (ou achar mais de uma vigente) o sistema avisa em vez de calcular errado.
-Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) entram por fora.
+Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) ainda entram por
+fora: hoje o Passo 2 lança e acompanha o status de cada desconto, mas o resumo da semana do Passo 1 não
+soma esse valor automaticamente ainda (fica para o fechamento do Passo 3, onde os dois se encontram).
 
 ## Stack
 

@@ -201,6 +201,62 @@ export const lancamentos = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Descontos de avaria/extravio (Passo 2) — lançados pela área de Descontos
+// (Flávia), travados para o líder (só visualiza). Baseado na planilha real
+// "EXTRAVIO DNR": um pacote (TBR) gera um desconto, com um responsável que
+// pode ser um motorista cadastrado, a própria base, a liderança ou um
+// parceiro/colaborador ainda sem cadastro — por isso nomeResponsavel (texto
+// bruto, sempre preenchido) existe separado de motoristaId (link, quando dá
+// pra identificar quem é). Parcelas: Admin/Descontos podem dividir um valor
+// alto em mais de uma cobrança (ex.: 3x), cada parcela é uma linha própria.
+// ---------------------------------------------------------------------------
+
+export const TIPOS_RESPONSAVEL = ["MOTORISTA", "BASE", "LIDERANCA", "PARCEIRO"] as const;
+export type TipoResponsavel = (typeof TIPOS_RESPONSAVEL)[number];
+
+export const ACOES_DESCONTO = [
+  "COBRAR_ENTREGADOR",
+  "COBRAR_PARCEIRO",
+  "COBRAR_MOTORISTA",
+  "COBRAR_COLABORADOR",
+  "DEBITO_BASE",
+  "COBRAR_LIDERANCA",
+  "CONTESTACAO",
+] as const;
+export type AcaoDesconto = (typeof ACOES_DESCONTO)[number];
+
+export const STATUS_DESCONTO = ["DEVIDO", "PAGO", "CONTESTADO", "CANCELADO"] as const;
+export type StatusDesconto = (typeof STATUS_DESCONTO)[number];
+
+export const descontos = pgTable(
+  "descontos",
+  {
+    id: serial("id").primaryKey(),
+    baseId: integer("base_id")
+      .notNull()
+      .references(() => bases.id),
+    motoristaId: integer("motorista_id").references(() => motoristas.id), // link quando identificado
+    tipoResponsavel: text("tipo_responsavel").$type<TipoResponsavel>().notNull().default("MOTORISTA"),
+    nomeResponsavel: text("nome_responsavel").notNull(), // nome bruto (planilha/lançamento manual)
+    tbr: text("tbr"), // código de rastreio do pacote, quando houver
+    nodeOrigem: text("node_origem"), // código do node de origem (ex.: SSR9, PJE1) — nem sempre é a mesma base nossa
+    motivo: text("motivo").notNull(),
+    acao: text("acao").$type<AcaoDesconto>().notNull(),
+    valor: dinheiro("valor").notNull(),
+    parcelas: integer("parcelas").notNull().default(1),
+    parcelaAtual: integer("parcela_atual").notNull().default(1),
+    periodoApuracao: text("periodo_apuracao"), // ex.: "SEMANA 35" (texto livre, como vem da planilha)
+    mesCobranca: date("mes_cobranca"),
+    origem: text("origem"), // LOST / DNR / BONUS / OUTRO
+    status: text("status").$type<StatusDesconto>().notNull().default("DEVIDO"),
+    observacoes: text("observacoes"),
+    lancadoPorId: integer("lancado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("descontos_base_idx").on(t.baseId), index("descontos_motorista_idx").on(t.motoristaId)],
+);
+
+// ---------------------------------------------------------------------------
 // Auditoria centralizada — toda alteração relevante grava aqui
 // ---------------------------------------------------------------------------
 

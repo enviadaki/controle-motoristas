@@ -30,11 +30,48 @@ export type Perfil = "ADMIN" | "DESCONTOS" | "LIDER" | "FINANCEIRO";
 export type Operacao = "AMAZON" | "SHOPEE" | "LOGGI";
 export type TipoVeiculo = "MOTO" | "PASSEIO" | "UTILITARIO" | "VAN" | "CAMINHAO";
 export type StatusMotorista = "ATIVO" | "INATIVO" | "DESLIGADO";
+export type TipoResponsavel = "MOTORISTA" | "BASE" | "LIDERANCA" | "PARCEIRO";
+export type AcaoDesconto =
+  | "COBRAR_ENTREGADOR"
+  | "COBRAR_PARCEIRO"
+  | "COBRAR_MOTORISTA"
+  | "COBRAR_COLABORADOR"
+  | "DEBITO_BASE"
+  | "COBRAR_LIDERANCA"
+  | "CONTESTACAO";
+export type StatusDesconto = "DEVIDO" | "PAGO" | "CONTESTADO" | "CANCELADO";
 
 export const PERFIS: Perfil[] = ["ADMIN", "DESCONTOS", "LIDER", "FINANCEIRO"];
 export const OPERACOES: Operacao[] = ["AMAZON", "SHOPEE", "LOGGI"];
 export const TIPOS_VEICULO: TipoVeiculo[] = ["MOTO", "PASSEIO", "UTILITARIO", "VAN", "CAMINHAO"];
 export const STATUS_MOTORISTA: StatusMotorista[] = ["ATIVO", "INATIVO", "DESLIGADO"];
+export const TIPOS_RESPONSAVEL: TipoResponsavel[] = ["MOTORISTA", "BASE", "LIDERANCA", "PARCEIRO"];
+export const ACOES_DESCONTO: AcaoDesconto[] = [
+  "COBRAR_ENTREGADOR",
+  "COBRAR_PARCEIRO",
+  "COBRAR_MOTORISTA",
+  "COBRAR_COLABORADOR",
+  "DEBITO_BASE",
+  "COBRAR_LIDERANCA",
+  "CONTESTACAO",
+];
+export const STATUS_DESCONTO: StatusDesconto[] = ["DEVIDO", "PAGO", "CONTESTADO", "CANCELADO"];
+
+export const ROTULO_ACAO: Record<AcaoDesconto, string> = {
+  COBRAR_ENTREGADOR: "Cobrar do entregador",
+  COBRAR_PARCEIRO: "Cobrar do parceiro",
+  COBRAR_MOTORISTA: "Cobrar do motorista",
+  COBRAR_COLABORADOR: "Cobrar do colaborador",
+  DEBITO_BASE: "Débito fica para a base",
+  COBRAR_LIDERANCA: "Cobrar da liderança",
+  CONTESTACAO: "Em contestação",
+};
+export const ROTULO_STATUS_DESCONTO: Record<StatusDesconto, string> = {
+  DEVIDO: "Devido",
+  PAGO: "Pago",
+  CONTESTADO: "Contestado",
+  CANCELADO: "Cancelado",
+};
 
 export const ROTULO_PERFIL: Record<Perfil, string> = {
   ADMIN: "Administrador",
@@ -161,6 +198,28 @@ export interface ResumoSemana {
   valorResgates: number;
   valorDescontoInsucesso: number;
   valorTotal: number;
+}
+
+export interface Desconto {
+  id: number;
+  baseId: number;
+  baseCodigo: string;
+  motoristaId: number | null;
+  motoristaNome: string | null;
+  tipoResponsavel: TipoResponsavel;
+  nomeResponsavel: string;
+  tbr: string | null;
+  nodeOrigem: string | null;
+  motivo: string;
+  acao: AcaoDesconto;
+  valor: string;
+  parcelas: number;
+  parcelaAtual: number;
+  periodoApuracao: string | null;
+  mesCobranca: string | null;
+  origem: string | null;
+  status: StatusDesconto;
+  observacoes: string | null;
 }
 
 export interface RegistroAuditoria {
