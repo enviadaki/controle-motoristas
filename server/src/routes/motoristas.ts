@@ -4,15 +4,18 @@ import { and, asc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db/index.js";
 import { bases, motoristas, STATUS_MOTORISTA, TIPOS_VEICULO } from "../db/schema.js";
-import { basesPermitidas, podeVerBase, requirePerfil } from "../lib/auth.js";
+import { basesPermitidas, podeVerBase, requirePerfil, type UsuarioSessao } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
-import { idParam, soDigitos, textoOpcional, validarCpf } from "../lib/util.js";
+import { idParam, soDigitos, textoOpcional, validarCpf, validarNomeCompleto } from "../lib/util.js";
 
 export const motoristasRouter = Router();
 
-// Quem pode cadastrar/editar motorista. Líder só consulta (dados de pagamento
-// como PIX e favorecido não devem ser alterados pela base).
-const EDITORES = ["ADMIN", "FINANCEIRO"] as const;
+// Quem pode cadastrar/editar motorista: Admin, Financeiro e Líder (só da
+// própria base). Dados de pagamento (PIX, favorecido, banco, responsável
+// pelo pagamento) ficam travados para o Líder — só Admin/Financeiro mexem
+// nisso, pra não virar o mesmo problema do desconto solto na planilha.
+const EDITORES = ["ADMIN", "FINANCEIRO", "LIDER"] as const;
+const CAMPOS_PAGAMENTO = ["responsavelPagamentoId", "chavePix", "favorecido", "dadosBancarios", "contratoAssinado"] as const;
 
 const responsavel = alias(motoristas, "responsavel");
 
@@ -86,7 +89,11 @@ motoristasRouter.get("/:id", async (req, res) => {
 
 const motoristaSchema = z
   .object({
-    nome: z.string().trim().min(3, "Informe o nome completo"),
+    nome: z
+      .string()
+      .trim()
+      .min(3, "Informe o nome completo")
+      .refine(validarNomeCompleto, "Informe o nome completo (nome e sobrenome), sem apelido"),
     cpf: textoOpcional.transform(soDigitos),
     cnpj: textoOpcional.transform(soDigitos),
     telefone: textoOpcional.transform(soDigitos),
@@ -117,8 +124,36 @@ async function validarResponsavel(id: number | null, proprioId?: number) {
   return id;
 }
 
+type DadosMotorista = z.infer<typeof motoristaSchema>;
+
+// Líder não mexe em dados de pagamento nem move o motorista pra outra base:
+// no cadastro, esses campos nascem vazios/falsos; na edição, mantém o que já
+// estava gravado — ignora silenciosamente o que vier da tela (a tela do
+// Líder nem mostra esses campos, então isso é só uma segunda trava).
+function aplicarRestricoesLider(
+  usuario: UsuarioSessao,
+  dados: DadosMotorista,
+  existente: typeof motoristas.$inferSelect | null,
+) {
+  if (usuario.perfil !== "LIDER") return dados;
+  const baseId = existente ? existente.baseId : dados.baseId;
+  if (!podeVerBase(usuario, baseId)) {
+    throw Object.assign(new Error("Você só pode cadastrar motoristas da sua própria base"), { status: 403 });
+  }
+  const ajustado: DadosMotorista = { ...dados, baseId };
+  for (const campo of CAMPOS_PAGAMENTO) {
+    (ajustado as Record<string, unknown>)[campo] = existente
+      ? existente[campo as keyof typeof existente]
+      : campo === "contratoAssinado"
+        ? false
+        : null;
+  }
+  return ajustado;
+}
+
 motoristasRouter.post("/", requirePerfil(...EDITORES), async (req, res) => {
-  const dados = motoristaSchema.parse(req.body);
+  let dados = motoristaSchema.parse(req.body);
+  dados = aplicarRestricoesLider(req.usuario!, dados, null);
   dados.responsavelPagamentoId = await validarResponsavel(dados.responsavelPagamentoId);
   const [novo] = await db.insert(motoristas).values(dados).returning();
   await registrarAuditoria(req, "CRIAR", "motorista", novo.id, null, novo);
@@ -127,9 +162,10 @@ motoristasRouter.post("/", requirePerfil(...EDITORES), async (req, res) => {
 
 motoristasRouter.put("/:id", requirePerfil(...EDITORES), async (req, res) => {
   const id = idParam.parse(req.params.id);
-  const dados = motoristaSchema.parse(req.body);
+  let dados = motoristaSchema.parse(req.body);
   const [antes] = await db.select().from(motoristas).where(eq(motoristas.id, id));
-  if (!antes) return res.status(404).json({ erro: "Motorista não encontrado" });
+  if (!antes || !podeVerBase(req.usuario!, antes.baseId)) return res.status(404).json({ erro: "Motorista não encontrado" });
+  dados = aplicarRestricoesLider(req.usuario!, dados, antes);
   dados.responsavelPagamentoId = await validarResponsavel(dados.responsavelPagamentoId, id);
   const [depois] = await db
     .update(motoristas)

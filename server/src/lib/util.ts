@@ -28,6 +28,16 @@ export const dinheiroObrigatorio = dinheiroOpcional.refine((v) => v !== null, "V
 
 export const idParam = z.coerce.number().int().positive();
 
+// Exige nome e sobrenome (pelo menos 2 palavras de 2+ letras cada) para o
+// Financeiro não confundir motoristas por apelido ou nome incompleto na hora
+// de bater com a nota fiscal/PIX. Aceita acentos, hífen e apóstrofo (ex.:
+// "Maria d'Ávila", "João Pedro-Neto").
+const PALAVRA_NOME = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'-]+$/;
+export function validarNomeCompleto(nome: string): boolean {
+  const palavras = nome.trim().split(/\s+/);
+  return palavras.length >= 2 && palavras.every((p) => PALAVRA_NOME.test(p));
+}
+
 export function validarCpf(cpf: string): boolean {
   if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
   const dv = (n: number) => {

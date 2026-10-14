@@ -19,7 +19,8 @@ const COR_STATUS = { ATIVO: "verde", INATIVO: "amarelo", DESLIGADO: "cinza" } as
 
 export function Motoristas() {
   const { tem } = useAuth();
-  const podeEditar = tem("ADMIN", "FINANCEIRO");
+  const podeEditar = tem("ADMIN", "FINANCEIRO", "LIDER");
+  const podeVerPagamento = tem("ADMIN", "FINANCEIRO");
   const [baseId, setBaseId] = useState("");
   const [status, setStatus] = useState<StatusMotorista | "">("ATIVO");
   const [busca, setBusca] = useState("");
@@ -54,6 +55,7 @@ export function Motoristas() {
       <Cabecalho
         titulo="Motoristas"
         descricao={podeEditar ? "Cadastro dos prestadores de serviço por base" : "Consulta dos motoristas da sua base"}
+        
         acoes={
           podeEditar && (
             <Botao onClick={() => setEditando("novo")}>
@@ -135,6 +137,7 @@ export function Motoristas() {
           motorista={editando === "novo" ? null : editando}
           bases={bases.data ?? []}
           somenteLeitura={!podeEditar}
+          podeVerPagamento={podeVerPagamento}
           aoFechar={() => setEditando(null)}
         />
       )}
@@ -174,11 +177,13 @@ function FormMotorista({
   motorista,
   bases,
   somenteLeitura,
+  podeVerPagamento,
   aoFechar,
 }: {
   motorista: Motorista | null;
   bases: Base[];
   somenteLeitura: boolean;
+  podeVerPagamento: boolean;
   aoFechar: () => void;
 }) {
   const qc = useQueryClient();
@@ -233,7 +238,12 @@ function FormMotorista({
       {erro && !erro.campo && <AvisoErro>{erro.message}</AvisoErro>}
       <fieldset disabled={ro} className="space-y-5">
         <Secao titulo="Identificação">
-          <Campo rotulo="Nome completo *" erro={erroDe("nome")} className="sm:col-span-2">
+          <Campo
+            rotulo="Nome completo *"
+            dica={ro ? undefined : "Nome e sobrenome, sem apelido — é o que o Financeiro usa para bater com a nota fiscal"}
+            erro={erroDe("nome")}
+            className="sm:col-span-2"
+          >
             <input className="campo" value={f.nome} onChange={set("nome")} />
           </Campo>
           <Campo rotulo="CPF" erro={erroDe("cpf")}>
@@ -285,6 +295,7 @@ function FormMotorista({
           </Campo>
         </Secao>
 
+        {podeVerPagamento && (
         <Secao titulo="Pagamento">
           <Campo
             rotulo="Responsável pelo pagamento"
@@ -315,6 +326,7 @@ function FormMotorista({
             Contrato de prestação de serviço assinado
           </label>
         </Secao>
+        )}
 
         <Campo rotulo="Observações">
           <textarea className="campo min-h-[70px]" value={f.observacoes} onChange={set("observacoes")} />
