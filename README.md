@@ -163,18 +163,24 @@ com SSL Let's Encrypt e Force SSL. Depois feche a porta 81 no Security Group.
 
 **Reaproveitando um host que já roda outro sistema** (ex.: `romaneio-app-prod`, que já tem um Nginx
 Proxy Manager rodando pra outro domínio): não suba o serviço `npm` deste projeto — ele bateria nas
-portas 80/443 já ocupadas. Use o override de exemplo:
+portas 80/443 já ocupadas. Em vez de publicar a API numa porta do host, junte o container da API à
+mesma rede Docker que o NPM já usa (o NPM roda no próprio container dele, então `127.0.0.1` visto de
+dentro do NPM não é o host — publicar a API em `127.0.0.1:PORTA` dá 502 Bad Gateway). Use o override
+de exemplo:
 
 ```bash
 git clone https://github.com/enviadaki/controle-motoristas.git && cd controle-motoristas
 cp .env.example .env && nano .env
-cp docker-compose.override.yml.exemplo docker-compose.override.yml   # publica a API só em 127.0.0.1:5001
+docker network ls | grep proxy              # descubra o nome da rede do NPM existente
+cp docker-compose.override.yml.exemplo docker-compose.override.yml
+nano docker-compose.override.yml             # ajuste o nome da rede externa (ex.: sistema-romaneio_proxy)
 docker compose up -d --build app postgres    # sem o "npm"
 docker compose exec -e ADMIN_NOME="Rafael Bezerra" -e ADMIN_EMAIL=rafael@enviadaki.com.br -e ADMIN_SENHA='senha-forte' app node dist/db/seed.js
 ```
 
 Depois, no NPM já existente da instância, crie um Proxy Host novo para `controle-motoristas.enviadaki.com.br`
-apontando para `127.0.0.1:5001`, com SSL Let's Encrypt e Force SSL.
+apontando para o **nome do container** da API (ex.: `controle-motoristas-app-1`, confira com `docker compose ps`)
+na porta `5000` (porta interna, não publicada no host), com SSL Let's Encrypt e Force SSL.
 
 Atualizar após um merge na `main`:
 
