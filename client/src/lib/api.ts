@@ -97,6 +97,22 @@ export const ROTULO_STATUS_PARCELAMENTO: Record<StatusParcelamento, string> = {
   APROVADO: "Aprovado",
   REJEITADO: "Rejeitado",
 };
+export type ModeloCalculo = "ROTA_FIXA" | "POR_PACOTE" | "POR_PARADA" | "ROTA_HORA";
+export type DuracaoRota = "6H" | "8H";
+export const MODELOS_CALCULO: ModeloCalculo[] = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA"];
+export const ROTULO_MODELO: Record<ModeloCalculo, string> = {
+  ROTA_FIXA: "Rota fixa (semana)",
+  POR_PACOTE: "Por pacote",
+  POR_PARADA: "Por parada",
+  ROTA_HORA: "Rota por duração (6h/8h)",
+};
+export const DICA_MODELO: Record<ModeloCalculo, string> = {
+  ROTA_FIXA: "Valor fixo pela semana se rodou; + domingo, pacotes acima da média e adicional.",
+  POR_PACOTE: "Pacotes entregues × valor por pacote. O valor individual do motorista (se cadastrado) tem prioridade sobre o da rota.",
+  POR_PARADA: "Paradas feitas × valor por parada.",
+  ROTA_HORA: "Cada dia rodado vale o valor da rota de 6h ou de 8h, conforme o líder marcar.",
+};
+
 export const ROTULO_VEICULO: Record<TipoVeiculo, string> = {
   MOTO: "Moto",
   PASSEIO: "Passeio",
@@ -156,8 +172,13 @@ export interface LinhaValor {
   cidade: string;
   faixaKm: string | null;
   tipoVeiculo: TipoVeiculo;
-  valorRotaSemana: string;
+  modeloCalculo: ModeloCalculo;
+  valorRotaSemana: string | null;
   valorRotaDomingo: string | null;
+  valorPacote: string | null;
+  valorParada: string | null;
+  valorRota6h: string | null;
+  valorRota8h: string | null;
   mediaPacotes: number | null;
   valorAdicional: string | null;
   valorPacoteExtra: string | null;
@@ -185,8 +206,30 @@ export interface Lancamento {
   pacotesEntregues: number;
   pacotesInsucesso: number;
   paradasExtras: number;
+  paradas: number;
+  duracaoRota: DuracaoRota | null;
   resgates: number;
   observacoes: string | null;
+}
+
+export interface ValorMotorista {
+  id: number;
+  motoristaId: number;
+  motoristaNome: string;
+  baseId: number;
+  baseCodigo: string;
+  rotaPadrao: string | null;
+  valorPacote: string;
+  vigenciaInicio: string;
+  vigenciaFim: string | null;
+  observacoes: string | null;
+}
+
+export interface ItemProducao {
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  total: number;
 }
 
 export interface SemanaLancamentos {
@@ -200,18 +243,24 @@ export interface ResumoSemana {
   motoristaId: number;
   semanaInicio: string;
   semanaFim: string;
+  modeloCalculo: ModeloCalculo | null;
   diasTrabalhados: number;
   trabalhouDomingo: boolean;
   pacotesEntregues: number;
   pacotesInsucesso: number;
+  paradas: number;
   paradasExtras: number;
   resgates: number;
+  rotas6h: number;
+  rotas8h: number;
   tabelaValorId: number | null;
   avisoValor: string | null;
   valorRotaSemana: number;
   valorRotaDomingo: number;
   valorAdicional: number;
   valorPacotesExtra: number;
+  itensProducao: ItemProducao[];
+  valorProducao: number;
   valorParadasExtra: number;
   valorResgates: number;
   valorDescontoInsucesso: number;

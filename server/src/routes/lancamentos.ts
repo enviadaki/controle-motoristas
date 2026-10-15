@@ -2,10 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { and, asc, eq, gte, inArray, lte, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bases, lancamentos, motoristas } from "../db/schema.js";
+import { bases, DURACOES_ROTA, lancamentos, motoristas } from "../db/schema.js";
 import { basesPermitidas, podeVerBase, requirePerfil } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
-import { calcularSemanaMotorista } from "../lib/calculo.js";
+import { calcularSemanaMotorista, modeloVigenteMotorista } from "../lib/calculo.js";
 import { hojeISO, idParam, semanaDe, semanaFechada } from "../lib/util.js";
 
 export const lancamentosRouter = Router();
@@ -25,6 +25,8 @@ const colunasLista = {
   pacotesEntregues: lancamentos.pacotesEntregues,
   pacotesInsucesso: lancamentos.pacotesInsucesso,
   paradasExtras: lancamentos.paradasExtras,
+  paradas: lancamentos.paradas,
+  duracaoRota: lancamentos.duracaoRota,
   resgates: lancamentos.resgates,
   observacoes: lancamentos.observacoes,
   updatedAt: lancamentos.updatedAt,
@@ -64,6 +66,27 @@ lancamentosRouter.get("/", async (req, res) => {
   res.json({ semanaInicio: inicio, semanaFim: fim, fechada: semanaFechada(inicio), itens: lista });
 });
 
+// Modelo de cálculo vigente da rota de cada motorista ativo da base, numa
+// data — a grade do líder usa pra mostrar só os campos que valem pra cada um
+// (paradas, duração 6h/8h...). null = motorista sem tabela de valor vigente.
+lancamentosRouter.get("/modelos", async (req, res) => {
+  const f = z
+    .object({
+      baseId: z.coerce.number().int().positive(),
+      data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    })
+    .parse(req.query);
+  if (!podeVerBase(req.usuario!, f.baseId)) return res.json({});
+  const dataRef = semanaDe(f.data ?? hojeISO()).inicio;
+  const lista = await db
+    .select({ id: motoristas.id, baseId: motoristas.baseId, tipoVeiculo: motoristas.tipoVeiculo, rotaPadrao: motoristas.rotaPadrao })
+    .from(motoristas)
+    .where(and(eq(motoristas.baseId, f.baseId), eq(motoristas.status, "ATIVO")));
+  const modelos: Record<number, string | null> = {};
+  for (const m of lista) modelos[m.id] = await modeloVigenteMotorista(m, dataRef);
+  res.json(modelos);
+});
+
 // Resumo calculado da semana para um motorista (valor a pagar, com o
 // detalhamento de como chegou nele).
 lancamentosRouter.get("/resumo/:motoristaId", async (req, res) => {
@@ -85,6 +108,11 @@ const lancamentoSchema = z.object({
   pacotesEntregues: z.coerce.number().int().min(0).default(0),
   pacotesInsucesso: z.coerce.number().int().min(0).default(0),
   paradasExtras: z.coerce.number().int().min(0).default(0),
+  paradas: z.coerce.number().int().min(0).default(0),
+  duracaoRota: z
+    .enum(DURACOES_ROTA)
+    .nullish()
+    .transform((v) => v ?? null),
   resgates: z.coerce.number().int().min(0).default(0),
   observacoes: z
     .string()

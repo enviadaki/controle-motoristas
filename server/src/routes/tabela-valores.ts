@@ -2,10 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { and, asc, eq, inArray, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bases, tabelaValores, OPERACOES, TIPOS_VEICULO } from "../db/schema.js";
+import { bases, tabelaValores, MODELOS_CALCULO, OPERACOES, TIPOS_VEICULO } from "../db/schema.js";
 import { basesPermitidas, requirePerfil } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
-import { dinheiroObrigatorio, dinheiroOpcional, idParam, textoOpcional } from "../lib/util.js";
+import { dinheiroOpcional, idParam, textoOpcional } from "../lib/util.js";
 
 export const tabelaValoresRouter = Router();
 
@@ -18,8 +18,13 @@ const { createdAt: _c, updatedAt: _u, ...tabelaValoresColunas } = {
   cidade: tabelaValores.cidade,
   faixaKm: tabelaValores.faixaKm,
   tipoVeiculo: tabelaValores.tipoVeiculo,
+  modeloCalculo: tabelaValores.modeloCalculo,
   valorRotaSemana: tabelaValores.valorRotaSemana,
   valorRotaDomingo: tabelaValores.valorRotaDomingo,
+  valorPacote: tabelaValores.valorPacote,
+  valorParada: tabelaValores.valorParada,
+  valorRota6h: tabelaValores.valorRota6h,
+  valorRota8h: tabelaValores.valorRota8h,
   mediaPacotes: tabelaValores.mediaPacotes,
   valorAdicional: tabelaValores.valorAdicional,
   valorPacoteExtra: tabelaValores.valorPacoteExtra,
@@ -60,8 +65,13 @@ const valorSchema = z
     cidade: z.string().trim().min(2, "Informe a cidade ou rota"),
     faixaKm: textoOpcional,
     tipoVeiculo: z.enum(TIPOS_VEICULO),
-    valorRotaSemana: dinheiroObrigatorio,
+    modeloCalculo: z.enum(MODELOS_CALCULO).default("ROTA_FIXA"),
+    valorRotaSemana: dinheiroOpcional,
     valorRotaDomingo: dinheiroOpcional,
+    valorPacote: dinheiroOpcional,
+    valorParada: dinheiroOpcional,
+    valorRota6h: dinheiroOpcional,
+    valorRota8h: dinheiroOpcional,
     mediaPacotes: z.coerce.number().int().nonnegative().nullish().transform((v) => v ?? null),
     valorAdicional: dinheiroOpcional,
     valorPacoteExtra: dinheiroOpcional,
@@ -72,9 +82,21 @@ const valorSchema = z
     vigenciaFim: dataISO.nullish().transform((v) => v ?? null),
     observacoes: textoOpcional,
   })
-  .refine((v) => !v.vigenciaFim || v.vigenciaFim >= v.vigenciaInicio, {
-    path: ["vigenciaFim"],
-    message: "Fim da vigência antes do início",
+  .superRefine((v, ctx) => {
+    if (v.vigenciaFim && v.vigenciaFim < v.vigenciaInicio) {
+      ctx.addIssue({ code: "custom", path: ["vigenciaFim"], message: "Fim da vigência antes do início" });
+    }
+    // Cada modelo exige o valor que ele usa pra calcular. POR_PACOTE não exige
+    // valorPacote: a rota pode ter só valores individuais por motorista.
+    if (v.modeloCalculo === "ROTA_FIXA" && v.valorRotaSemana === null) {
+      ctx.addIssue({ code: "custom", path: ["valorRotaSemana"], message: "Informe o valor da rota (seg. a sáb.)" });
+    }
+    if (v.modeloCalculo === "POR_PARADA" && v.valorParada === null) {
+      ctx.addIssue({ code: "custom", path: ["valorParada"], message: "Informe o valor por parada" });
+    }
+    if (v.modeloCalculo === "ROTA_HORA" && v.valorRota6h === null && v.valorRota8h === null) {
+      ctx.addIssue({ code: "custom", path: ["valorRota6h"], message: "Informe o valor da rota de 6h e/ou de 8h" });
+    }
   });
 
 async function validarOperacaoDaBase(baseId: number, operacao: string) {
