@@ -22,6 +22,13 @@
       "when": 1792004526136,
       "tag": "0002_hard_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792062816970,
+      "tag": "0003_broad_skullbuster",
+      "breakpoints": true
     }
   ]
 }

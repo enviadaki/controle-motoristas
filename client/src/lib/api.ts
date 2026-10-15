@@ -26,7 +26,7 @@ export async function api<T = unknown>(caminho: string, opcoes: { method?: strin
 
 // ---- Tipos compartilhados com a API ----
 
-export type Perfil = "ADMIN" | "DESCONTOS" | "LIDER" | "FINANCEIRO";
+export type Perfil = "ADMIN" | "DESCONTOS" | "LIDER" | "FINANCEIRO" | "CFO";
 export type Operacao = "AMAZON" | "SHOPEE" | "LOGGI";
 export type TipoVeiculo = "MOTO" | "PASSEIO" | "UTILITARIO" | "VAN" | "CAMINHAO";
 export type StatusMotorista = "ATIVO" | "INATIVO" | "DESLIGADO";
@@ -40,8 +40,9 @@ export type AcaoDesconto =
   | "COBRAR_LIDERANCA"
   | "CONTESTACAO";
 export type StatusDesconto = "DEVIDO" | "PAGO" | "CONTESTADO" | "CANCELADO";
+export type StatusParcelamento = "PENDENTE" | "APROVADO" | "REJEITADO";
 
-export const PERFIS: Perfil[] = ["ADMIN", "DESCONTOS", "LIDER", "FINANCEIRO"];
+export const PERFIS: Perfil[] = ["ADMIN", "DESCONTOS", "LIDER", "FINANCEIRO", "CFO"];
 export const OPERACOES: Operacao[] = ["AMAZON", "SHOPEE", "LOGGI"];
 export const TIPOS_VEICULO: TipoVeiculo[] = ["MOTO", "PASSEIO", "UTILITARIO", "VAN", "CAMINHAO"];
 export const STATUS_MOTORISTA: StatusMotorista[] = ["ATIVO", "INATIVO", "DESLIGADO"];
@@ -78,6 +79,12 @@ export const ROTULO_PERFIL: Record<Perfil, string> = {
   DESCONTOS: "Descontos",
   LIDER: "Líder de base",
   FINANCEIRO: "Financeiro",
+  CFO: "CFO",
+};
+export const ROTULO_STATUS_PARCELAMENTO: Record<StatusParcelamento, string> = {
+  PENDENTE: "Pendente de aprovação",
+  APROVADO: "Aprovado",
+  REJEITADO: "Rejeitado",
 };
 export const ROTULO_VEICULO: Record<TipoVeiculo, string> = {
   MOTO: "Moto",
@@ -215,6 +222,10 @@ export interface Desconto {
   valor: string;
   parcelas: number;
   parcelaAtual: number;
+  statusParcelamento: StatusParcelamento | null;
+  aprovadoPorNome: string | null;
+  aprovadoEm: string | null;
+  motivoRejeicaoParcelamento: string | null;
   periodoApuracao: string | null;
   mesCobranca: string | null;
   origem: string | null;

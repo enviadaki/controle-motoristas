@@ -6,6 +6,7 @@ import {
   api,
   ROTULO_ACAO,
   ROTULO_STATUS_DESCONTO,
+  ROTULO_STATUS_PARCELAMENTO,
   STATUS_DESCONTO,
   TIPOS_RESPONSAVEL,
   type AcaoDesconto,
@@ -13,6 +14,7 @@ import {
   type Desconto,
   type Motorista,
   type StatusDesconto,
+  type StatusParcelamento,
   type TipoResponsavel,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -24,6 +26,11 @@ const CORES_STATUS: Record<StatusDesconto, "verde" | "amarelo" | "vermelho" | "c
   PAGO: "verde",
   CONTESTADO: "vermelho",
   CANCELADO: "cinza",
+};
+const CORES_PARCELAMENTO: Record<StatusParcelamento, "verde" | "amarelo" | "vermelho"> = {
+  PENDENTE: "amarelo",
+  APROVADO: "verde",
+  REJEITADO: "vermelho",
 };
 
 export function Descontos() {
@@ -113,6 +120,9 @@ export function Descontos() {
                   <td>
                     {d.nomeResponsavel}
                     {d.parcelas > 1 && <span className="ml-1 text-xs text-slate-400">({d.parcelaAtual}/{d.parcelas})</span>}
+                    {d.statusParcelamento && (
+                      <Selo cor={CORES_PARCELAMENTO[d.statusParcelamento]}>{ROTULO_STATUS_PARCELAMENTO[d.statusParcelamento]}</Selo>
+                    )}
                     {d.tbr && <div className="text-xs text-slate-400">{d.tbr}</div>}
                   </td>
                   <td className="max-w-xs truncate" title={d.motivo}>{d.motivo}</td>

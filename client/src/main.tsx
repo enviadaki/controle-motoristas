@@ -12,6 +12,7 @@ import { Inicio } from "./pages/Inicio";
 import { Motoristas } from "./pages/Motoristas";
 import { Lancamentos } from "./pages/Lancamentos";
 import { Descontos } from "./pages/Descontos";
+import { AprovacaoParcelamentos } from "./pages/AprovacaoParcelamentos";
 import { Bases } from "./pages/Bases";
 import { TabelaValores } from "./pages/TabelaValores";
 import { Usuarios } from "./pages/Usuarios";
@@ -32,6 +33,8 @@ function Protegido({ perfis, children }: { perfis?: Perfil[]; children: React.Re
 
 function Rotas() {
   const { usuario, carregando } = useAuth();
+  // CFO (Linsmar) é o único que autoriza parcelamento — a primeira tela dele
+  // ao entrar é a fila de aprovação, não o painel geral.
   return (
     <Routes>
       <Route path="/login" element={!carregando && usuario ? <Navigate to="/" replace /> : <Login />} />
@@ -42,7 +45,8 @@ function Rotas() {
           </Protegido>
         }
       >
-        <Route index element={<Inicio />} />
+        <Route index element={usuario?.perfil === "CFO" ? <AprovacaoParcelamentos /> : <Inicio />} />
+        <Route path="aprovacoes" element={<Protegido perfis={["CFO", "ADMIN"]}><AprovacaoParcelamentos /></Protegido>} />
         <Route path="lancamentos" element={<Lancamentos />} />
         <Route path="descontos" element={<Descontos />} />
         <Route path="motoristas" element={<Motoristas />} />

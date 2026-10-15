@@ -19,12 +19,14 @@ import { sql } from "drizzle-orm";
 // Domínios fixos
 // ---------------------------------------------------------------------------
 
-export const PERFIS = ["ADMIN", "DESCONTOS", "LIDER", "FINANCEIRO"] as const;
+export const PERFIS = ["ADMIN", "DESCONTOS", "LIDER", "FINANCEIRO", "CFO"] as const;
 export type Perfil = (typeof PERFIS)[number];
 // ADMIN       -> acesso total (Rafael / Alex)
 // DESCONTOS   -> lança e gerencia descontos de avaria/extravio (Flávia)
 // LIDER       -> lança a operação diária da(s) sua(s) base(s); vê descontos travados
 // FINANCEIRO  -> confere fechamentos e consolidado de todas as bases (Miriam / Valnei)
+// CFO         -> único perfil que autoriza parcelamento de desconto (Linsmar); sem isso, o
+//                parcelamento lançado pela Descontos fica pendente e não vale ainda
 
 export const OPERACOES = ["AMAZON", "SHOPEE", "LOGGI"] as const;
 export type Operacao = (typeof OPERACOES)[number];
@@ -228,6 +230,13 @@ export type AcaoDesconto = (typeof ACOES_DESCONTO)[number];
 export const STATUS_DESCONTO = ["DEVIDO", "PAGO", "CONTESTADO", "CANCELADO"] as const;
 export type StatusDesconto = (typeof STATUS_DESCONTO)[number];
 
+// Autorização do parcelamento (pedido do Rafael): quando a Descontos marca um
+// desconto como parcelado (parcelas > 1), a regra só vale depois que o CFO
+// (Linsmar — único perfil que autoriza) aprovar. Null = não é parcelado, não
+// precisa de autorização.
+export const STATUS_PARCELAMENTO = ["PENDENTE", "APROVADO", "REJEITADO"] as const;
+export type StatusParcelamento = (typeof STATUS_PARCELAMENTO)[number];
+
 export const descontos = pgTable(
   "descontos",
   {
@@ -245,6 +254,12 @@ export const descontos = pgTable(
     valor: dinheiro("valor").notNull(),
     parcelas: integer("parcelas").notNull().default(1),
     parcelaAtual: integer("parcela_atual").notNull().default(1),
+    // Preenchido sozinho (não vem do formulário): null enquanto parcelas=1;
+    // PENDENTE assim que parcelas>1 até o CFO decidir.
+    statusParcelamento: text("status_parcelamento").$type<StatusParcelamento>(),
+    aprovadoPorId: integer("aprovado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
+    aprovadoEm: timestamp("aprovado_em", { withTimezone: true }),
+    motivoRejeicaoParcelamento: text("motivo_rejeicao_parcelamento"),
     periodoApuracao: text("periodo_apuracao"), // ex.: "SEMANA 35" (texto livre, como vem da planilha)
     mesCobranca: date("mes_cobranca"),
     origem: text("origem"), // LOST / DNR / BONUS / OUTRO
@@ -253,7 +268,11 @@ export const descontos = pgTable(
     lancadoPorId: integer("lancado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
     ...timestamps,
   },
-  (t) => [index("descontos_base_idx").on(t.baseId), index("descontos_motorista_idx").on(t.motoristaId)],
+  (t) => [
+    index("descontos_base_idx").on(t.baseId),
+    index("descontos_motorista_idx").on(t.motoristaId),
+    index("descontos_status_parcelamento_idx").on(t.statusParcelamento),
+  ],
 );
 
 // ---------------------------------------------------------------------------

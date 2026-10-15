@@ -7,8 +7,8 @@ import { Cabecalho, Cartao, Selo } from "../components/ui";
 
 const ROTEIRO = [
   { passo: "Passo 0", titulo: "Cadastros: bases, motoristas, tabela de valores, usuários e perfis", feito: true },
-  { passo: "Passo 1", titulo: "Lançamento diário de rota pelo líder (substitui a planilha da base)", feito: false },
-  { passo: "Passo 2", titulo: "Lançamento de descontos (avaria/extravio) travados, com evidência e parcelamento", feito: false },
+  { passo: "Passo 1", titulo: "Lançamento diário de rota pelo líder (substitui a planilha da base)", feito: true },
+  { passo: "Passo 2", titulo: "Lançamento de descontos (avaria/extravio) travados, com parcelamento autorizado pelo CFO", feito: true },
   { passo: "Passo 3", titulo: "Fechamento automático com farol + nota fiscal anexada pelo líder", feito: false },
   { passo: "Passo 4", titulo: "Consolidado do Financeiro (todas as bases, pronto para o dia 10)", feito: false },
 ];

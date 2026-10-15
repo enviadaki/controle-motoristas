@@ -10,6 +10,7 @@ const DESCRICAO_PERFIL: Record<Perfil, string> = {
   DESCONTOS: "Lança e gerencia os descontos de avaria/extravio (a partir do Passo 2).",
   LIDER: "Lança a operação diária da(s) sua(s) base(s) e vê os descontos travados. Só enxerga as próprias bases.",
   FINANCEIRO: "Confere fechamentos e o consolidado de todas as bases; mantém dados de pagamento dos motoristas.",
+  CFO: "Único perfil que autoriza parcelamento de desconto. Ao entrar, cai direto na fila de aprovação.",
 };
 
 export function Usuarios() {

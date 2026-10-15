@@ -25,12 +25,14 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 | Descontos | Flávia | Lança e gerencia descontos (Passo 2) |
 | Líder de base | Líderes das bases | Lança a operação diária **só das bases vinculadas a ele**; vê descontos sem poder alterar |
 | Financeiro | Miriam, Valnei | Confere fechamentos e consolidado; mantém dados de pagamento (PIX, favorecido) dos motoristas |
+| CFO | Linsmar | **Único** que autoriza parcelamento de desconto. Ao entrar, cai direto na fila de aprovação |
 
 Regras já aplicadas no servidor (não só na tela):
 - Líder só enxerga motoristas, bases e valores das bases vinculadas a ele.
 - Cadastro/edição de motorista: Administrador, Financeiro e Líder (líder não mexe nos dados de pagamento, e o nome exige nome e sobrenome completos).
 - Lançamento diário: Administrador, Financeiro e Líder (só das bases dele); a semana fecha sozinha ao virar — líder só edita a semana corrente, Admin/Financeiro corrigem semanas fechadas.
 - Descontos de avaria/extravio: só Administrador e Descontos lançam/editam; Líder só visualiza (da própria base); Financeiro só muda o status (Devido/Pago/Contestado/Cancelado) ao conferir.
+- Parcelamento (desconto com mais de 1x): nasce **pendente**, e só o CFO aprova ou rejeita — nem o Administrador pode (regra pedida explicitamente). Qualquer edição no desconto parcelado (valor, parcelas, motivo) volta o status pra pendente, exige aprovar de novo.
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
@@ -46,7 +48,9 @@ veículo + rota padrão do motorista (campo "Rota padrão" no cadastro precisa b
 tabela de valores); se não achar (ou achar mais de uma vigente) o sistema avisa em vez de calcular errado.
 Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) ainda entram por
 fora: hoje o Passo 2 lança e acompanha o status de cada desconto, mas o resumo da semana do Passo 1 não
-soma esse valor automaticamente ainda (fica para o fechamento do Passo 3, onde os dois se encontram).
+soma esse valor automaticamente ainda (fica para o fechamento do Passo 3, onde os dois se encontram). Um
+desconto parcelado também só deve valer depois que o CFO aprovar — isso ainda vai precisar ser respeitado
+quando o Passo 3 somar os descontos no fechamento.
 
 ## Stack
 

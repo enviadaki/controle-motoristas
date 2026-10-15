@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { ACOES_DESCONTO, bases, descontos, motoristas, STATUS_DESCONTO, TIPOS_RESPONSAVEL } from "../db/schema.js";
+import { ACOES_DESCONTO, bases, descontos, motoristas, STATUS_DESCONTO, STATUS_PARCELAMENTO, TIPOS_RESPONSAVEL, usuarios } from "../db/schema.js";
 import { basesPermitidas, podeVerBase, requirePerfil } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { dinheiroObrigatorio, idParam, textoOpcional } from "../lib/util.js";
@@ -29,6 +29,10 @@ const colunasLista = {
   valor: descontos.valor,
   parcelas: descontos.parcelas,
   parcelaAtual: descontos.parcelaAtual,
+  statusParcelamento: descontos.statusParcelamento,
+  aprovadoPorNome: usuarios.nome,
+  aprovadoEm: descontos.aprovadoEm,
+  motivoRejeicaoParcelamento: descontos.motivoRejeicaoParcelamento,
   periodoApuracao: descontos.periodoApuracao,
   mesCobranca: descontos.mesCobranca,
   origem: descontos.origem,
@@ -42,13 +46,15 @@ function consultaBase() {
     .select(colunasLista)
     .from(descontos)
     .innerJoin(bases, eq(bases.id, descontos.baseId))
-    .leftJoin(motoristas, eq(motoristas.id, descontos.motoristaId));
+    .leftJoin(motoristas, eq(motoristas.id, descontos.motoristaId))
+    .leftJoin(usuarios, eq(usuarios.id, descontos.aprovadoPorId));
 }
 
 const filtrosSchema = z.object({
   baseId: z.coerce.number().int().positive().optional(),
   motoristaId: z.coerce.number().int().positive().optional(),
   status: z.enum(STATUS_DESCONTO).optional(),
+  statusParcelamento: z.enum(STATUS_PARCELAMENTO).optional(),
   busca: z.string().trim().optional(), // nome do responsável, TBR ou motivo
 });
 
@@ -62,6 +68,7 @@ descontosRouter.get("/", async (req, res) => {
   if (f.baseId) cond.push(eq(descontos.baseId, f.baseId));
   if (f.motoristaId) cond.push(eq(descontos.motoristaId, f.motoristaId));
   if (f.status) cond.push(eq(descontos.status, f.status));
+  if (f.statusParcelamento) cond.push(eq(descontos.statusParcelamento, f.statusParcelamento));
   if (f.busca) {
     const termo = `%${f.busca}%`;
     cond.push(or(ilike(descontos.nomeResponsavel, termo), ilike(descontos.tbr, termo), ilike(descontos.motivo, termo))!);
@@ -108,10 +115,22 @@ async function validarMotorista(baseId: number, motoristaId: number | null) {
   if (m.baseId !== baseId) throw Object.assign(new Error("Motorista não pertence à base selecionada"), { status: 400 });
 }
 
+// Parcelas > 1 nasce (ou volta) pendente de autorização do CFO — qualquer
+// edição nos termos do parcelamento exige aprovar de novo, nunca herda a
+// aprovação anterior.
+function camposParcelamento(parcelas: number) {
+  return parcelas > 1
+    ? { statusParcelamento: "PENDENTE" as const, aprovadoPorId: null, aprovadoEm: null, motivoRejeicaoParcelamento: null }
+    : { statusParcelamento: null, aprovadoPorId: null, aprovadoEm: null, motivoRejeicaoParcelamento: null };
+}
+
 descontosRouter.post("/", requirePerfil(...EDITORES), async (req, res) => {
   const dados = descontoSchema.parse(req.body);
   await validarMotorista(dados.baseId, dados.motoristaId);
-  const [novo] = await db.insert(descontos).values({ ...dados, lancadoPorId: req.usuario!.id }).returning();
+  const [novo] = await db
+    .insert(descontos)
+    .values({ ...dados, ...camposParcelamento(dados.parcelas), lancadoPorId: req.usuario!.id })
+    .returning();
   await registrarAuditoria(req, "CRIAR", "desconto", novo.id, null, novo);
   res.status(201).json(novo);
 });
@@ -124,10 +143,40 @@ descontosRouter.put("/:id", requirePerfil(...EDITORES), async (req, res) => {
   if (!antes) return res.status(404).json({ erro: "Desconto não encontrado" });
   const [depois] = await db
     .update(descontos)
-    .set({ ...dados, updatedAt: new Date() })
+    .set({ ...dados, ...camposParcelamento(dados.parcelas), updatedAt: new Date() })
     .where(eq(descontos.id, id))
     .returning();
   await registrarAuditoria(req, "EDITAR", "desconto", id, antes, depois);
+  res.json(depois);
+});
+
+// Autorização do parcelamento — só o CFO decide. Primeira tela dele no
+// sistema é a lista de PENDENTE (ver GET / com ?statusParcelamento=PENDENTE).
+const aprovacaoSchema = z.object({
+  aprovado: z.boolean(),
+  motivoRejeicao: textoOpcional,
+});
+
+descontosRouter.put("/:id/aprovar-parcelamento", requirePerfil("CFO"), async (req, res) => {
+  const id = idParam.parse(req.params.id);
+  const { aprovado, motivoRejeicao } = aprovacaoSchema.parse(req.body);
+  const [antes] = await db.select().from(descontos).where(eq(descontos.id, id));
+  if (!antes) return res.status(404).json({ erro: "Desconto não encontrado" });
+  if (antes.statusParcelamento !== "PENDENTE") {
+    return res.status(400).json({ erro: "Este parcelamento já foi avaliado" });
+  }
+  const [depois] = await db
+    .update(descontos)
+    .set({
+      statusParcelamento: aprovado ? "APROVADO" : "REJEITADO",
+      aprovadoPorId: req.usuario!.id,
+      aprovadoEm: new Date(),
+      motivoRejeicaoParcelamento: aprovado ? null : motivoRejeicao,
+      updatedAt: new Date(),
+    })
+    .where(eq(descontos.id, id))
+    .returning();
+  await registrarAuditoria(req, aprovado ? "APROVAR_PARCELAMENTO" : "REJEITAR_PARCELAMENTO", "desconto", id, antes, depois);
   res.json(depois);
 });
 
