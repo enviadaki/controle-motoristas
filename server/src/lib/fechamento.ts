@@ -77,7 +77,10 @@ export async function calcularResumoFechamento(baseId: number, dataRef: string):
     const resumo = await calcularSemanaMotorista(m.id, inicio);
     const descontosAplicados = porMotorista.get(m.id) ?? 0;
     const totalLiquido = Math.max(0, resumo.valorTotal - descontosAplicados);
-    const temPendenciaValor = resumo.avisoValor !== null && resumo.diasTrabalhados > 0;
+    // Nos modelos por dia (pacote/parada/6h-8h) só o domingo já gera valor,
+    // então domingo rodado também conta como "rodou na semana".
+    const rodou = resumo.diasTrabalhados > 0 || resumo.trabalhouDomingo;
+    const temPendenciaValor = resumo.avisoValor !== null && rodou;
     linhas.push({ motoristaId: m.id, motoristaNome: m.nome, resumo, descontosAplicados, totalLiquido, temPendenciaValor });
   }
 

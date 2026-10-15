@@ -12,6 +12,7 @@ import { motoristasRouter } from "./routes/motoristas.js";
 import { lancamentosRouter } from "./routes/lancamentos.js";
 import { descontosRouter } from "./routes/descontos.js";
 import { tabelaValoresRouter } from "./routes/tabela-valores.js";
+import { valoresMotoristaRouter } from "./routes/valores-motorista.js";
 import { usuariosRouter } from "./routes/usuarios.js";
 import { auditoriaRouter } from "./routes/auditoria.js";
 import { fechamentosRouter } from "./routes/fechamentos.js";
@@ -44,6 +45,7 @@ export function criarApp(opcoes: { pastaFrontend?: string; pastaUploads?: string
   app.use("/api/consolidado", requireAuth, consolidadoRouter);
   app.use("/api/notas-fiscais", requireAuth, notasFiscaisRouter);
   app.use("/api/tabela-valores", requireAuth, tabelaValoresRouter);
+  app.use("/api/valores-motorista", requireAuth, valoresMotoristaRouter);
   app.use("/api/usuarios", requireAuth, requirePerfil("ADMIN"), usuariosRouter);
   app.use("/api/auditoria", requireAuth, requirePerfil("ADMIN"), auditoriaRouter);
 

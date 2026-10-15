@@ -36,21 +36,44 @@ Regras já aplicadas no servidor (não só na tela):
 - Fechamento semanal (Passo 3): Administrador, Financeiro e o próprio Líder (só da sua base) fecham a semana — exige só o farol **verde**, sem anexo nenhum (a nota fiscal é mensal, não semanal — ver abaixo). Reabrir uma semana já fechada é só de Administrador e Financeiro (o líder não reabre sozinho).
 - Consolidado do Financeiro (Passo 4): só Administrador e Financeiro enxergam todas as bases juntas.
 - Nota fiscal mensal (Passo 4): Administrador, Financeiro e Líder anexam — o líder só enxerga/anexa pelos responsáveis da própria base; Descontos e CFO não têm acesso a essa tela.
-- Tabela de valores, bases e usuários: só Administrador.
+- Tabela de valores (por rota/cidade), bases e usuários: só Administrador.
+- Valor por pacote individual do motorista: o Líder cadastra (só motoristas das bases dele), além de Administrador e Financeiro. O Líder só mexe da semana atual em diante — não dá pra ele mudar o valor de uma semana que já fechou; Administrador e Financeiro podem corrigir o passado. Tudo fica na auditoria.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
 
 ### Como funciona o cálculo do Passo 1
 
-Modelo "SAJ" (confirmado com o Rafael): o motorista recebe um **valor fixo pela semana** (segunda a
-sábado) se rodou pelo menos um dia, mais um valor extra se também rodou no domingo. Pacotes acima da
-média inclusa geram adicional por unidade; cada **pacote em insucesso desconta um valor fixo** (não é
-"tudo ou nada" por dia — o motorista não perde a rota por não completá-la, perde por pacote não entregue).
-Paradas extras e resgates também somam. Tudo isso vem da **tabela de valores**, casando base + tipo de
-veículo + rota padrão do motorista (campo "Rota padrão" no cadastro precisa bater com a "Cidade/rota" da
-tabela de valores); se não achar (ou achar mais de uma vigente) o sistema avisa em vez de calcular errado.
-Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) entram por fora, e se
-encontram com ele no fechamento (Passo 3).
+Cada cidade/rota tem a sua forma de pagamento, escolhida na **tabela de valores** (campo "Como é pago"),
+que casa base + tipo de veículo + rota padrão do motorista (o campo "Rota padrão" no cadastro precisa
+bater com a "Cidade/rota" da tabela). São quatro modelos:
+
+| Modelo | Exemplo | Como calcula | O líder lança |
+|---|---|---|---|
+| **Rota fixa** | Sede VDC, SAJ | **valor fixo pela semana** (seg.–sáb.) se rodou pelo menos um dia + valor de domingo se rodou no domingo + adicional + pacotes acima da média inclusa × valor do pacote extra | entregues, insucesso, paradas extra, resgates |
+| **Por pacote** | Rotas filhas do interior | pacotes entregues × valor por pacote **do dia**: o valor individual do motorista, se ele tiver um vigente; senão, o valor padrão da rota | entregues, insucesso, paradas extra, resgates |
+| **Por parada** | — | paradas × valor por parada | paradas, entregues, insucesso, resgates |
+| **Rota por duração** | Rotas de 6h ou 8h | cada dia rodado vale o valor da duração que o líder marcar + o valor do **complemento**, se pediram uma rota extra de outra duração no dia. As durações (6h, 8h, 2h, 4h...) e os valores são cadastrados por rota | duração, complemento (opcional), entregues, insucesso, paradas extra, resgates |
+
+**Domingo** nos modelos por pacote, por parada e por duração: cada valor tem um campo opcional de
+domingo. Em branco, domingo vale igual aos outros dias. No modelo por pacote a ordem é: valor de domingo
+do motorista → valor de domingo da rota → valor normal do dia.
+
+Em **todos** os modelos: cada **pacote em insucesso desconta um valor fixo** (o motorista não perde a
+rota por não completá-la, perde por pacote não entregue), e paradas extras e resgates somam. A tela de
+lançamentos mostra pra cada motorista só os campos do modelo da rota dele.
+
+**Valor por pacote individual** (aba "Valor por motorista" da tabela de valores): nas rotas por pacote
+cada entregador pode ter o próprio valor. Ele tem vigência — pra mudar o valor de alguém, preencha o fim
+da vigência atual e cadastre o novo; o histórico fica guardado e o cálculo usa, dia a dia, o valor que
+valia naquele dia (se mudar no meio da semana, o resumo mostra as duas linhas). O sistema não deixa
+cadastrar duas vigências sobrepostas pro mesmo motorista.
+
+Se faltar alguma informação pra calcular (motorista sem tabela de valor vigente, mais de uma tabela
+vigente, rota por pacote sem valor nenhum, dia de rota por duração sem a duração marcada) o sistema avisa em
+vez de calcular errado, e o farol do fechamento fica vermelho até resolver. Lançar uma duração que não
+está cadastrada na rota é recusado na hora. Isto é só o lado operacional —
+os descontos de avaria/extravio da Flávia (Passo 2) entram por fora, e se encontram com ele no
+fechamento (Passo 3).
 
 ### Como funciona o fechamento do Passo 3
 

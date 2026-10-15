@@ -37,6 +37,21 @@ export type TipoVeiculo = (typeof TIPOS_VEICULO)[number];
 export const STATUS_MOTORISTA = ["ATIVO", "INATIVO", "DESLIGADO"] as const;
 export type StatusMotorista = (typeof STATUS_MOTORISTA)[number];
 
+// Como o motorista é pago numa cidade/rota — cada base/cidade tem a sua regra:
+// ROTA_FIXA   -> valor fixo semanal pela rota (+ domingo, pacote extra acima da
+//                média, adicional). Ex.: sede VDC, SAJ.
+// POR_PACOTE  -> pacotes entregues × valor por pacote. Ex.: rotas filhas do
+//                interior. Cada motorista pode ter o próprio valor por pacote
+//                (tabela valores_motorista); sem ele, vale o valor da rota.
+// POR_PARADA  -> paradas × valor por parada.
+// ROTA_HORA   -> valor fixo por dia conforme a duração da rota (6h, 8h...), com
+//                as durações e valores cadastrados por rota (tabela_valores_duracoes)
+//                e um complemento opcional de outra duração no mesmo dia.
+// Nos modelos por unidade, o valor de domingo é opcional: em branco, domingo
+// vale igual aos outros dias.
+export const MODELOS_CALCULO = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA"] as const;
+export type ModeloCalculo = (typeof MODELOS_CALCULO)[number];
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -132,12 +147,16 @@ export const motoristas = pgTable(
 // ---------------------------------------------------------------------------
 // Tabela de valores (parâmetros de pagamento)
 // ---------------------------------------------------------------------------
-// Uma linha = valor de rota para (base, operação, cidade/rota, tipo de veículo)
-// dentro de um período de vigência. Cobre os modelos vistos nas planilhas:
-//   - SAJ: por cidade/faixa de KM, com média de pacotes e adicional
-//   - Filiais: valor de rota fixo por cidade
-//   - Parâmetros extras (parada extra, resgate, insucesso) por linha
-// O cálculo automático que usa estes valores entra no Passo 1.
+// Uma linha = regra de pagamento para (base, operação, cidade/rota, tipo de
+// veículo) dentro de um período de vigência. O modeloCalculo diz quais campos
+// valem (ver MODELOS_CALCULO):
+//   - ROTA_FIXA:  valorRotaSemana (obrigatório), valorRotaDomingo, mediaPacotes,
+//                 valorPacoteExtra, valorAdicional
+//   - POR_PACOTE: valorPacote / valorPacoteDomingo (padrão da rota; o valor do
+//                 motorista, se houver, tem prioridade)
+//   - POR_PARADA: valorParada / valorParadaDomingo
+//   - ROTA_HORA:  durações em tabela_valores_duracoes
+// Em todos: valorParadaExtra, valorResgate e valorDescontoInsucesso.
 
 export const tabelaValores = pgTable(
   "tabela_valores",
@@ -150,8 +169,13 @@ export const tabelaValores = pgTable(
     cidade: text("cidade").notNull(), // cidade ou nome da rota
     faixaKm: text("faixa_km"), // ex.: "0 - 50"
     tipoVeiculo: text("tipo_veiculo").$type<TipoVeiculo>().notNull(),
-    valorRotaSemana: dinheiro("valor_rota_semana").notNull(), // seg. a sáb.
+    modeloCalculo: text("modelo_calculo").$type<ModeloCalculo>().notNull().default("ROTA_FIXA"),
+    valorRotaSemana: dinheiro("valor_rota_semana"), // seg. a sáb. (obrigatório em ROTA_FIXA)
     valorRotaDomingo: dinheiro("valor_rota_domingo"), // domingo e feriado
+    valorPacote: dinheiro("valor_pacote"), // POR_PACOTE: valor padrão por pacote entregue
+    valorPacoteDomingo: dinheiro("valor_pacote_domingo"), // POR_PACOTE: domingo (vazio = igual)
+    valorParada: dinheiro("valor_parada"), // POR_PARADA: valor por parada
+    valorParadaDomingo: dinheiro("valor_parada_domingo"), // POR_PARADA: domingo (vazio = igual)
     mediaPacotes: integer("media_pacotes"), // pacotes inclusos na rota
     valorAdicional: dinheiro("valor_adicional"),
     valorPacoteExtra: dinheiro("valor_pacote_extra"),
@@ -166,12 +190,53 @@ export const tabelaValores = pgTable(
   (t) => [index("tabela_valores_base_idx").on(t.baseId, t.operacao)],
 );
 
+// Durações de rota de uma linha ROTA_HORA (ex.: 6h e 8h como rota principal,
+// 2h ou 4h pedidas como complemento) — cada uma com o seu valor por dia.
+export const tabelaValoresDuracoes = pgTable(
+  "tabela_valores_duracoes",
+  {
+    id: serial("id").primaryKey(),
+    tabelaValorId: integer("tabela_valor_id")
+      .notNull()
+      .references(() => tabelaValores.id, { onDelete: "cascade" }),
+    horas: integer("horas").notNull(),
+    valor: dinheiro("valor").notNull(),
+    valorDomingo: dinheiro("valor_domingo"), // vazio = igual aos outros dias
+  },
+  (t) => [uniqueIndex("tabela_valores_duracoes_unique").on(t.tabelaValorId, t.horas)],
+);
+
+// ---------------------------------------------------------------------------
+// Valor por pacote individual do motorista (rotas POR_PACOTE). Nas rotas
+// filhas cada entregador negocia o próprio valor por pacote — fica aqui, com
+// vigência, pra trocar o valor sem perder o histórico do que ele recebia antes.
+// Tem prioridade sobre o valorPacote da tabela de valores da rota.
+// ---------------------------------------------------------------------------
+
+export const valoresMotorista = pgTable(
+  "valores_motorista",
+  {
+    id: serial("id").primaryKey(),
+    motoristaId: integer("motorista_id")
+      .notNull()
+      .references(() => motoristas.id),
+    valorPacote: dinheiro("valor_pacote").notNull(),
+    valorPacoteDomingo: dinheiro("valor_pacote_domingo"), // vazio = igual aos outros dias
+    vigenciaInicio: date("vigencia_inicio").notNull(),
+    vigenciaFim: date("vigencia_fim"), // nulo = vigente
+    observacoes: text("observacoes"),
+    ...timestamps,
+  },
+  (t) => [index("valores_motorista_motorista_idx").on(t.motoristaId, t.vigenciaInicio)],
+);
+
 // ---------------------------------------------------------------------------
 // Lançamentos diários (Passo 1) — líder registra, por motorista e por dia, o
 // que rodou. Uma linha por (motorista, data); o valor da semana é calculado
 // a partir daqui + tabela_valores (ver lib/calculo.ts), nunca digitado à mão.
-// Modelo confirmado com o Rafael: valor fixo semanal (seg.–sáb., +domingo se
-// rodou), com desconto por pacote em insucesso (não é "tudo ou nada" por dia).
+// Quais campos o líder preenche depende do modelo de cálculo da rota do
+// motorista (paradas em POR_PARADA, duração e complemento em ROTA_HORA); o
+// desconto por pacote em insucesso vale em todos os modelos.
 // ---------------------------------------------------------------------------
 
 export const lancamentos = pgTable(
@@ -191,6 +256,9 @@ export const lancamentos = pgTable(
     pacotesEntregues: integer("pacotes_entregues").notNull().default(0),
     pacotesInsucesso: integer("pacotes_insucesso").notNull().default(0), // gera desconto
     paradasExtras: integer("paradas_extras").notNull().default(0),
+    paradas: integer("paradas").notNull().default(0), // total de paradas (rotas POR_PARADA)
+    horasRota: integer("horas_rota"), // rotas ROTA_HORA: duração da rota do dia (ex.: 6, 8)
+    horasComplemento: integer("horas_complemento"), // rotas ROTA_HORA: complemento pedido no dia (opcional)
     resgates: integer("resgates").notNull().default(0), // meia rota / resgate
     observacoes: text("observacoes"),
     lancadoPorId: integer("lancado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
