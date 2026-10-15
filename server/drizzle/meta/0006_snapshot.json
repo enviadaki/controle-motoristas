@@ -1,5 +1,5 @@
 {
-  "id": "11b95e6c-717e-48fe-9668-1ab7270297a4",
+  "id": "2fd3ac80-e724-4f93-945d-4d22e62f7205",
   "prevId": "e382862b-42bf-4174-99f7-bd7b000b271b",
   "version": "7",
   "dialect": "postgresql",
@@ -665,9 +665,15 @@
           "notNull": true,
           "default": 0
         },
-        "duracao_rota": {
-          "name": "duracao_rota",
-          "type": "text",
+        "horas_rota": {
+          "name": "horas_rota",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "horas_complemento": {
+          "name": "horas_complemento",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -1177,20 +1183,20 @@
           "primaryKey": false,
           "notNull": false
         },
+        "valor_pacote_domingo": {
+          "name": "valor_pacote_domingo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "valor_parada": {
           "name": "valor_parada",
           "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": false
         },
-        "valor_rota_6h": {
-          "name": "valor_rota_6h",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "valor_rota_8h": {
-          "name": "valor_rota_8h",
+        "valor_parada_domingo": {
+          "name": "valor_parada_domingo",
           "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": false
@@ -1299,6 +1305,85 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tabela_valores_duracoes": {
+      "name": "tabela_valores_duracoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tabela_valor_id": {
+          "name": "tabela_valor_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "horas": {
+          "name": "horas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor": {
+          "name": "valor",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_domingo": {
+          "name": "valor_domingo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "tabela_valores_duracoes_unique": {
+          "name": "tabela_valores_duracoes_unique",
+          "columns": [
+            {
+              "expression": "tabela_valor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "horas",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tabela_valores_duracoes_tabela_valor_id_tabela_valores_id_fk": {
+          "name": "tabela_valores_duracoes_tabela_valor_id_tabela_valores_id_fk",
+          "tableFrom": "tabela_valores_duracoes",
+          "tableTo": "tabela_valores",
+          "columnsFrom": [
+            "tabela_valor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -1467,6 +1552,12 @@
           "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "valor_pacote_domingo": {
+          "name": "valor_pacote_domingo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
         },
         "vigencia_inicio": {
           "name": "vigencia_inicio",

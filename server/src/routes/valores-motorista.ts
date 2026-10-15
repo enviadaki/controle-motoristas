@@ -5,14 +5,22 @@ import { db } from "../db/index.js";
 import { bases, motoristas, valoresMotorista } from "../db/schema.js";
 import { basesPermitidas, podeVerBase, requirePerfil } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
-import { dinheiroOpcional, idParam, textoOpcional } from "../lib/util.js";
+import { dinheiroOpcional, idParam, semanaAtual, textoOpcional } from "../lib/util.js";
 
-// Valor por pacote individual de cada motorista (rotas POR_PACOTE). É dado de
-// pagamento do motorista — mesma regra do PIX/favorecido: Admin e Financeiro
-// cadastram; o Líder só enxerga (das bases dele).
+// Valor por pacote individual de cada motorista (rotas POR_PACOTE). Quem
+// negocia o valor com o entregador é o líder da base, então o Líder cadastra
+// (só motoristas das bases dele), além de Admin e Financeiro. Tudo vai pra
+// auditoria.
+//
+// Trava de semana fechada: o fechamento é recalculado a partir destes valores,
+// então mudar um valor com data no passado mudaria o pagamento de uma semana
+// já fechada. O Líder só pode mexer da semana atual em diante (mesma regra dos
+// lançamentos); Admin e Financeiro podem corrigir o passado.
 export const valoresMotoristaRouter = Router();
 
-const EDITORES = ["ADMIN", "FINANCEIRO"] as const;
+const EDITORES = ["ADMIN", "FINANCEIRO", "LIDER"] as const;
+const MSG_SEMANA_FECHADA =
+  "Isso mudaria o valor de uma semana que já fechou — o líder só altera da semana atual em diante. Peça pro Financeiro ou Admin corrigir.";
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data no formato AAAA-MM-DD");
 
 const colunas = {
@@ -23,6 +31,7 @@ const colunas = {
   baseCodigo: bases.codigo,
   rotaPadrao: motoristas.rotaPadrao,
   valorPacote: valoresMotorista.valorPacote,
+  valorPacoteDomingo: valoresMotorista.valorPacoteDomingo,
   vigenciaInicio: valoresMotorista.vigenciaInicio,
   vigenciaFim: valoresMotorista.vigenciaFim,
   observacoes: valoresMotorista.observacoes,
@@ -56,6 +65,7 @@ const valorSchema = z
   .object({
     motoristaId: z.coerce.number({ message: "Selecione o motorista" }).int().positive("Selecione o motorista"),
     valorPacote: dinheiroOpcional.refine((v) => v !== null, "Informe o valor por pacote"),
+    valorPacoteDomingo: dinheiroOpcional,
     vigenciaInicio: dataISO,
     vigenciaFim: dataISO.nullish().transform((v) => v ?? null),
     observacoes: textoOpcional,
@@ -66,6 +76,32 @@ const valorSchema = z
   });
 
 type Dados = z.infer<typeof valorSchema>;
+type Registro = typeof valoresMotorista.$inferSelect;
+
+// Último dia já fechado (domingo da semana passada).
+function ultimoDiaFechado() {
+  const d = new Date(`${semanaAtual().inicio}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// O pedaço de uma vigência que cai em semanas fechadas, com os valores que
+// valiam nele. Se o pedaço e os valores não mudam, as semanas fechadas não
+// mudam. null = não toca em semana fechada.
+function trechoFechado(r: { vigenciaInicio: string; vigenciaFim: string | null; valorPacote: string | null; valorPacoteDomingo: string | null }) {
+  const limite = ultimoDiaFechado();
+  if (r.vigenciaInicio > limite) return null;
+  const fim = r.vigenciaFim && r.vigenciaFim < limite ? r.vigenciaFim : limite;
+  const n = (v: string | null) => (v === null ? null : Number(v));
+  return JSON.stringify([r.vigenciaInicio, fim, n(r.valorPacote), n(r.valorPacoteDomingo)]);
+}
+
+function travaLider(req: Request, antes: Registro | null, depois: Dados | null) {
+  if (req.usuario!.perfil !== "LIDER") return;
+  const a = antes ? trechoFechado(antes) : null;
+  const d = depois ? trechoFechado({ ...depois, valorPacote: depois.valorPacote ?? null }) : null;
+  if (a !== d) throw Object.assign(new Error(MSG_SEMANA_FECHADA), { status: 403 });
+}
 
 async function validar(req: Request, dados: Dados, proprioId?: number) {
   const [m] = await db.select().from(motoristas).where(eq(motoristas.id, dados.motoristaId));
@@ -99,6 +135,7 @@ async function validar(req: Request, dados: Dados, proprioId?: number) {
 valoresMotoristaRouter.post("/", requirePerfil(...EDITORES), async (req, res) => {
   const dados = valorSchema.parse(req.body);
   await validar(req, dados);
+  travaLider(req, null, dados);
   const [novo] = await db.insert(valoresMotorista).values(dados as typeof valoresMotorista.$inferInsert).returning();
   await registrarAuditoria(req, "CRIAR", "valor_motorista", novo.id, null, novo);
   res.status(201).json(novo);
@@ -109,7 +146,11 @@ valoresMotoristaRouter.put("/:id", requirePerfil(...EDITORES), async (req, res) 
   const dados = valorSchema.parse(req.body);
   const [antes] = await db.select().from(valoresMotorista).where(eq(valoresMotorista.id, id));
   if (!antes) return res.status(404).json({ erro: "Valor não encontrado" });
+  if (dados.motoristaId !== antes.motoristaId) {
+    return res.status(400).json({ erro: "Não dá pra trocar o motorista de um valor — cadastre um valor novo pro outro motorista" });
+  }
   await validar(req, dados, id);
+  travaLider(req, antes, dados);
   const [depois] = await db
     .update(valoresMotorista)
     .set({ ...(dados as typeof valoresMotorista.$inferInsert), updatedAt: new Date() })
@@ -121,8 +162,12 @@ valoresMotoristaRouter.put("/:id", requirePerfil(...EDITORES), async (req, res) 
 
 valoresMotoristaRouter.delete("/:id", requirePerfil(...EDITORES), async (req, res) => {
   const id = idParam.parse(req.params.id);
+  const [registro] = await db.select().from(valoresMotorista).where(eq(valoresMotorista.id, id));
+  if (!registro) return res.status(404).json({ erro: "Valor não encontrado" });
+  const [dono] = await db.select({ baseId: motoristas.baseId }).from(motoristas).where(eq(motoristas.id, registro.motoristaId));
+  if (!dono || !podeVerBase(req.usuario!, dono.baseId)) return res.status(404).json({ erro: "Valor não encontrado" });
+  travaLider(req, registro, null);
   const [antes] = await db.delete(valoresMotorista).where(eq(valoresMotorista.id, id)).returning();
-  if (!antes) return res.status(404).json({ erro: "Valor não encontrado" });
   await registrarAuditoria(req, "EXCLUIR", "valor_motorista", id, antes, null);
   res.json({ ok: true });
 });

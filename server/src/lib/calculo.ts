@@ -4,6 +4,7 @@ import {
   lancamentos,
   motoristas,
   tabelaValores,
+  tabelaValoresDuracoes,
   valoresMotorista,
   type ModeloCalculo,
   type TipoVeiculo,
@@ -27,8 +28,12 @@ import { semanaDe } from "./util.js";
 //   POR_PARADA:
 //     - Paradas lançadas × valorParada.
 //   ROTA_HORA:
-//     - Cada dia rodado vale valorRota6h ou valorRota8h, conforme a duração
-//       que o líder marcou naquele dia.
+//     - Cada dia rodado vale o valor da duração que o líder marcou (6h, 8h...,
+//       cadastradas por rota em tabela_valores_duracoes) + o valor do
+//       complemento, se pediram uma rota extra de outra duração no dia.
+//   Domingo nos três modelos acima: se houver valor de domingo cadastrado, ele
+//   vale no domingo; em branco, domingo vale igual aos outros dias. No POR_PACOTE
+//   a ordem é: domingo do motorista > domingo da rota > valor normal do dia.
 //
 // Em TODOS os modelos: paradas extras e resgates somam (valorParadaExtra /
 // valorResgate) e cada pacote em insucesso desconta valorDescontoInsucesso.
@@ -57,8 +62,6 @@ export interface ResumoSemana {
   paradas: number;
   paradasExtras: number;
   resgates: number;
-  rotas6h: number;
-  rotas8h: number;
   tabelaValorId: number | null;
   avisoValor: string | null; // pendências que impedem o cálculo certo (derrubam o farol)
   // ROTA_FIXA
@@ -66,7 +69,7 @@ export interface ResumoSemana {
   valorRotaDomingo: number;
   valorAdicional: number;
   valorPacotesExtra: number;
-  // POR_PACOTE / POR_PARADA / ROTA_HORA
+  // POR_PACOTE / POR_PARADA / ROTA_HORA (detalhe de cada valor unitário usado)
   itensProducao: ItemProducao[];
   valorProducao: number;
   // todos os modelos
@@ -137,8 +140,6 @@ export async function calcularSemanaMotorista(motoristaId: number, dataRef: stri
   const paradas = soma("paradas");
   const paradasExtras = soma("paradasExtras");
   const resgates = soma("resgates");
-  const rotas6h = trabalhados.filter((d) => d.duracaoRota === "6H").length;
-  const rotas8h = trabalhados.filter((d) => d.duracaoRota === "8H").length;
 
   const { linha: tv, aviso } = await buscarTabelaVigente(motorista.baseId, motorista.tipoVeiculo, motorista.rotaPadrao, inicio);
   const avisos: string[] = aviso ? [aviso] : [];
@@ -159,21 +160,18 @@ export async function calcularSemanaMotorista(motoristaId: number, dataRef: stri
   } else if (modelo === "POR_PACOTE") {
     itensProducao.push(...(await producaoPorPacote(motoristaId, tv!, dias, inicio, fim, avisos)));
   } else if (modelo === "POR_PARADA") {
-    if (paradas > 0) {
-      if (tv!.valorParada == null) avisos.push("Rota por parada sem valor por parada cadastrado");
-      else itensProducao.push(item("Paradas", paradas, n(tv!.valorParada)));
+    const agrupar = new Agrupador();
+    for (const d of dias) {
+      if (d.paradas === 0) continue;
+      const dom = ehDomingo(d.data) && tv!.valorParadaDomingo != null;
+      const valor = dom ? tv!.valorParadaDomingo : tv!.valorParada;
+      if (valor == null) continue;
+      agrupar.somar(dom ? "Paradas (domingo)" : "Paradas", d.paradas, Number(valor));
     }
+    if (paradas > 0 && tv!.valorParada == null) avisos.push("Rota por parada sem valor por parada cadastrado");
+    itensProducao.push(...agrupar.itens());
   } else if (modelo === "ROTA_HORA") {
-    const semDuracao = trabalhados.filter((d) => !d.duracaoRota).length;
-    if (semDuracao > 0) avisos.push(`${semDuracao} dia(s) rodado(s) sem a duração da rota (6h/8h) informada`);
-    for (const [qtd, valor, rotulo] of [
-      [rotas6h, tv!.valorRota6h, "Rotas de 6h"],
-      [rotas8h, tv!.valorRota8h, "Rotas de 8h"],
-    ] as const) {
-      if (qtd === 0) continue;
-      if (valor == null) avisos.push(`Sem valor cadastrado para ${rotulo.toLowerCase()} nesta rota`);
-      else itensProducao.push(item(rotulo, qtd, n(valor)));
-    }
+    itensProducao.push(...(await producaoPorDuracao(tv!, trabalhados, avisos)));
   }
 
   const valorProducao = arred(itensProducao.reduce((acc, i) => acc + i.total, 0));
@@ -207,8 +205,6 @@ export async function calcularSemanaMotorista(motoristaId: number, dataRef: stri
     paradas,
     paradasExtras,
     resgates,
-    rotas6h,
-    rotas8h,
     tabelaValorId: tv?.id ?? null,
     avisoValor: avisos.length ? avisos.join(" · ") : null,
     valorRotaSemana,
@@ -251,40 +247,101 @@ async function producaoPorPacote(
     )
     .orderBy(asc(valoresMotorista.vigenciaInicio));
 
-  const grupos = new Map<string, { descricao: string; quantidade: number; valorUnitario: number }>();
+  const agrupar = new Agrupador();
   let pacotesSemValor = 0;
   for (const d of dias) {
     if (d.pacotesEntregues === 0) continue;
+    const domingo = ehDomingo(d.data);
     // Se houver sobreposição de vigências, vale a que começou por último.
     const vigente = individuais
       .filter((v) => v.vigenciaInicio <= d.data && (!v.vigenciaFim || v.vigenciaFim >= d.data))
       .at(-1);
-    const [valor, origem] = vigente
-      ? [Number(vigente.valorPacote), "valor do motorista"]
-      : tv.valorPacote != null
-        ? [Number(tv.valorPacote), "valor da rota"]
-        : [null, null];
+    let valor: string | null = null;
+    let origem = "";
+    if (domingo && vigente?.valorPacoteDomingo != null) [valor, origem] = [vigente.valorPacoteDomingo, "valor do motorista, domingo"];
+    else if (domingo && tv.valorPacoteDomingo != null) [valor, origem] = [tv.valorPacoteDomingo, "valor da rota, domingo"];
+    else if (vigente) [valor, origem] = [vigente.valorPacote, "valor do motorista"];
+    else if (tv.valorPacote != null) [valor, origem] = [tv.valorPacote, "valor da rota"];
     if (valor === null) {
       pacotesSemValor += d.pacotesEntregues;
       continue;
     }
-    const chave = `${valor}|${origem}`;
-    const g = grupos.get(chave) ?? { descricao: `Pacotes entregues (${origem})`, quantidade: 0, valorUnitario: valor };
-    g.quantidade += d.pacotesEntregues;
-    grupos.set(chave, g);
+    agrupar.somar(`Pacotes entregues (${origem})`, d.pacotesEntregues, Number(valor));
   }
   if (pacotesSemValor > 0) {
     avisos.push(`${pacotesSemValor} pacote(s) sem valor por pacote cadastrado (nem do motorista, nem da rota)`);
   }
-  return [...grupos.values()].map((g) => item(g.descricao, g.quantidade, g.valorUnitario));
+  return agrupar.itens();
 }
 
-// Modelo de cálculo vigente da rota de cada motorista numa data — a tela de
-// lançamentos usa isto pra mostrar só os campos que importam pra cada um.
+// ROTA_HORA: cada dia rodado vale a duração principal marcada pelo líder +
+// o complemento (se houver), pelos valores cadastrados na linha da tabela.
+async function producaoPorDuracao(
+  tv: LinhaTabela,
+  trabalhados: (typeof lancamentos.$inferSelect)[],
+  avisos: string[],
+): Promise<ItemProducao[]> {
+  const duracoes = await db.select().from(tabelaValoresDuracoes).where(eq(tabelaValoresDuracoes.tabelaValorId, tv.id));
+  const porHoras = new Map(duracoes.map((d) => [d.horas, d]));
+  const agrupar = new Agrupador();
+  const semValor = new Set<number>();
+  let semDuracao = 0;
+  for (const d of trabalhados) {
+    if (d.horasRota == null) semDuracao++;
+    const domingo = ehDomingo(d.data);
+    for (const [horas, tipo] of [
+      [d.horasRota, "Rota"],
+      [d.horasComplemento, "Complemento"],
+    ] as const) {
+      if (horas == null) continue;
+      const faixa = porHoras.get(horas);
+      if (!faixa) {
+        semValor.add(horas);
+        continue;
+      }
+      const dom = domingo && faixa.valorDomingo != null;
+      agrupar.somar(`${tipo} de ${horas}h${dom ? " (domingo)" : ""}`, 1, Number(dom ? faixa.valorDomingo : faixa.valor));
+    }
+  }
+  if (semDuracao > 0) avisos.push(`${semDuracao} dia(s) rodado(s) sem a duração da rota informada`);
+  for (const h of semValor) avisos.push(`Sem valor cadastrado para rota de ${h}h nesta rota`);
+  return agrupar.itens();
+}
+
+// Junta quantidades com a mesma descrição e o mesmo valor unitário numa
+// linha só do resumo (ex.: "Rota de 8h: 4 × R$ 160,00").
+class Agrupador {
+  private grupos = new Map<string, { descricao: string; quantidade: number; valorUnitario: number }>();
+  somar(descricao: string, quantidade: number, valorUnitario: number) {
+    const chave = `${descricao}|${valorUnitario}`;
+    const g = this.grupos.get(chave) ?? { descricao, quantidade: 0, valorUnitario };
+    g.quantidade += quantidade;
+    this.grupos.set(chave, g);
+  }
+  itens(): ItemProducao[] {
+    return [...this.grupos.values()].map((g) => item(g.descricao, g.quantidade, g.valorUnitario));
+  }
+}
+
+// Modelo de cálculo vigente da rota de um motorista numa data (e, se for
+// ROTA_HORA, as durações cadastradas) — a tela de lançamentos usa isto pra
+// mostrar só os campos que importam pra cada um.
+export interface ModeloMotorista {
+  modelo: ModeloCalculo | null;
+  duracoes: number[];
+}
+
 export async function modeloVigenteMotorista(
   m: { baseId: number; tipoVeiculo: TipoVeiculo | null; rotaPadrao: string | null },
   dataRef: string,
-): Promise<ModeloCalculo | null> {
+): Promise<ModeloMotorista> {
   const { linha } = await buscarTabelaVigente(m.baseId, m.tipoVeiculo, m.rotaPadrao, dataRef);
-  return linha?.modeloCalculo ?? null;
+  if (!linha) return { modelo: null, duracoes: [] };
+  if (linha.modeloCalculo !== "ROTA_HORA") return { modelo: linha.modeloCalculo, duracoes: [] };
+  const duracoes = await db
+    .select({ horas: tabelaValoresDuracoes.horas })
+    .from(tabelaValoresDuracoes)
+    .where(eq(tabelaValoresDuracoes.tabelaValorId, linha.id))
+    .orderBy(asc(tabelaValoresDuracoes.horas));
+  return { modelo: "ROTA_HORA", duracoes: duracoes.map((d) => d.horas) };
 }

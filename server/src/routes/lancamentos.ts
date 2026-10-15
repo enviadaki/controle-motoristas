@@ -2,10 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { and, asc, eq, gte, inArray, lte, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bases, DURACOES_ROTA, lancamentos, motoristas } from "../db/schema.js";
+import { bases, lancamentos, motoristas } from "../db/schema.js";
 import { basesPermitidas, podeVerBase, requirePerfil } from "../lib/auth.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
-import { calcularSemanaMotorista, modeloVigenteMotorista } from "../lib/calculo.js";
+import { calcularSemanaMotorista, modeloVigenteMotorista, type ModeloMotorista } from "../lib/calculo.js";
 import { hojeISO, idParam, semanaDe, semanaFechada } from "../lib/util.js";
 
 export const lancamentosRouter = Router();
@@ -26,7 +26,8 @@ const colunasLista = {
   pacotesInsucesso: lancamentos.pacotesInsucesso,
   paradasExtras: lancamentos.paradasExtras,
   paradas: lancamentos.paradas,
-  duracaoRota: lancamentos.duracaoRota,
+  horasRota: lancamentos.horasRota,
+  horasComplemento: lancamentos.horasComplemento,
   resgates: lancamentos.resgates,
   observacoes: lancamentos.observacoes,
   updatedAt: lancamentos.updatedAt,
@@ -68,7 +69,8 @@ lancamentosRouter.get("/", async (req, res) => {
 
 // Modelo de cálculo vigente da rota de cada motorista ativo da base, numa
 // data — a grade do líder usa pra mostrar só os campos que valem pra cada um
-// (paradas, duração 6h/8h...). null = motorista sem tabela de valor vigente.
+// (paradas, duração da rota e complemento...). modelo null = motorista sem
+// tabela de valor vigente.
 lancamentosRouter.get("/modelos", async (req, res) => {
   const f = z
     .object({
@@ -82,7 +84,7 @@ lancamentosRouter.get("/modelos", async (req, res) => {
     .select({ id: motoristas.id, baseId: motoristas.baseId, tipoVeiculo: motoristas.tipoVeiculo, rotaPadrao: motoristas.rotaPadrao })
     .from(motoristas)
     .where(and(eq(motoristas.baseId, f.baseId), eq(motoristas.status, "ATIVO")));
-  const modelos: Record<number, string | null> = {};
+  const modelos: Record<number, ModeloMotorista> = {};
   for (const m of lista) modelos[m.id] = await modeloVigenteMotorista(m, dataRef);
   res.json(modelos);
 });
@@ -109,10 +111,8 @@ const lancamentoSchema = z.object({
   pacotesInsucesso: z.coerce.number().int().min(0).default(0),
   paradasExtras: z.coerce.number().int().min(0).default(0),
   paradas: z.coerce.number().int().min(0).default(0),
-  duracaoRota: z
-    .enum(DURACOES_ROTA)
-    .nullish()
-    .transform((v) => v ?? null),
+  horasRota: z.coerce.number().int().min(1).max(24).nullish().transform((v) => v ?? null),
+  horasComplemento: z.coerce.number().int().min(1).max(24).nullish().transform((v) => v ?? null),
   resgates: z.coerce.number().int().min(0).default(0),
   observacoes: z
     .string()
@@ -149,6 +149,28 @@ lancamentosRouter.post("/", requirePerfil(...EDITORES), async (req, res) => {
 
   if (existente && req.usuario!.perfil === "LIDER" && semanaFechada(existente.data)) {
     return res.status(403).json({ erro: "Esta semana já fechou — peça pro Financeiro ou Admin corrigir" });
+  }
+
+  // Rota por duração: a duração e o complemento têm que existir na tabela de
+  // valores da rota do motorista (senão o dia não teria valor pra calcular).
+  if (dados.horasRota !== null || dados.horasComplemento !== null) {
+    const { modelo, duracoes } = await modeloVigenteMotorista(motorista, semanaDe(dados.data).inicio);
+    if (modelo !== "ROTA_HORA") {
+      dados.horasRota = null;
+      dados.horasComplemento = null;
+    } else {
+      for (const [campo, h] of [
+        ["horasRota", dados.horasRota],
+        ["horasComplemento", dados.horasComplemento],
+      ] as const) {
+        if (h !== null && !duracoes.includes(h)) {
+          return res.status(400).json({
+            erro: `Rota de ${h}h não está cadastrada na tabela de valores desta rota (cadastradas: ${duracoes.map((x) => `${x}h`).join(", ") || "nenhuma"})`,
+            campo,
+          });
+        }
+      }
+    }
   }
 
   const valores = { ...dados, baseId: motorista.baseId, lancadoPorId: req.usuario!.id };

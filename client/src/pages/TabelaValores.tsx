@@ -9,6 +9,7 @@ import {
   ROTULO_VEICULO,
   TIPOS_VEICULO,
   type Base,
+  type DuracaoValor,
   type LinhaValor,
   type ModeloCalculo,
   type Motorista,
@@ -25,7 +26,7 @@ const hojeISO = () => new Date().toISOString().slice(0, 10);
 const vigente = (inicio: string, fim: string | null) => inicio <= hojeISO() && (!fim || fim >= hojeISO());
 
 export function TabelaValores() {
-  const { tem } = useAuth();
+  const { tem, usuario } = useAuth();
   const [aba, setAba] = useState<Aba>("rotas");
   const [baseId, setBaseId] = useState("");
   const [editando, setEditando] = useState<LinhaValor | "nova" | null>(null);
@@ -33,7 +34,9 @@ export function TabelaValores() {
   const bases = useQuery({ queryKey: ["bases"], queryFn: () => api<Base[]>("/bases") });
 
   const podeEditarRotas = tem("ADMIN");
-  const podeEditarMotoristas = tem("ADMIN", "FINANCEIRO");
+  // Quem negocia o valor por pacote com o entregador é o líder da base.
+  const podeEditarMotoristas = tem("ADMIN", "FINANCEIRO", "LIDER");
+  const basesDoUsuario = usuario?.perfil === "LIDER" ? (bases.data ?? []).filter((b) => usuario.baseIds.includes(b.id)) : (bases.data ?? []);
 
   return (
     <>
@@ -94,7 +97,7 @@ export function TabelaValores() {
         <FormValorMotorista
           valor={editandoMotorista === "novo" ? null : editandoMotorista}
           baseIdInicial={baseId}
-          bases={bases.data ?? []}
+          bases={basesDoUsuario}
           aoFechar={() => setEditandoMotorista(null)}
         />
       )}
@@ -114,16 +117,26 @@ function valorPrincipal(l: LinhaValor) {
         </>
       );
     case "POR_PACOTE":
-      return l.valorPacote ? `${moeda(l.valorPacote)}/pacote` : <span className="text-slate-500">valor de cada motorista</span>;
-    case "POR_PARADA":
-      return `${moeda(l.valorParada)}/parada`;
-    case "ROTA_HORA":
       return (
         <>
-          {l.valorRota6h && <span className="block">6h: {moeda(l.valorRota6h)}</span>}
-          {l.valorRota8h && <span className="block">8h: {moeda(l.valorRota8h)}</span>}
+          {l.valorPacote ? `${moeda(l.valorPacote)}/pacote` : <span className="text-slate-500">valor de cada motorista</span>}
+          {l.valorPacoteDomingo && <span className="block text-xs text-slate-500">dom. {moeda(l.valorPacoteDomingo)}</span>}
         </>
       );
+    case "POR_PARADA":
+      return (
+        <>
+          {moeda(l.valorParada)}/parada
+          {l.valorParadaDomingo && <span className="block text-xs text-slate-500">dom. {moeda(l.valorParadaDomingo)}</span>}
+        </>
+      );
+    case "ROTA_HORA":
+      return l.duracoes.map((d) => (
+        <span key={d.horas} className="block">
+          {d.horas}h: {moeda(d.valor)}
+          {d.valorDomingo && <span className="text-xs text-slate-500"> · dom. {moeda(d.valorDomingo)}</span>}
+        </span>
+      ));
   }
 }
 
@@ -192,13 +205,27 @@ const CAMPOS_MODELO: Record<ModeloCalculo, (readonly [keyof LinhaValor, string, 
     ["valorAdicional", "Valor adicional"],
     ["valorPacoteExtra", "Pacote extra (por unid.)", "Acima da média de pacotes inclusos"],
   ],
-  POR_PACOTE: [["valorPacote", "Valor por pacote (padrão da rota)", "Motorista com valor próprio usa o dele"]],
-  POR_PARADA: [["valorParada", "Valor por parada *"]],
-  ROTA_HORA: [
-    ["valorRota6h", "Rota de 6 horas (por dia)"],
-    ["valorRota8h", "Rota de 8 horas (por dia)"],
+  POR_PACOTE: [
+    ["valorPacote", "Valor por pacote (padrão da rota)", "Motorista com valor próprio usa o dele"],
+    ["valorPacoteDomingo", "Valor por pacote no domingo", "Em branco = igual aos outros dias"],
   ],
+  POR_PARADA: [
+    ["valorParada", "Valor por parada *"],
+    ["valorParadaDomingo", "Valor por parada no domingo", "Em branco = igual aos outros dias"],
+  ],
+  ROTA_HORA: [], // durações têm editor próprio (lista)
 };
+
+type LinhaDuracao = { horas: string; valor: string; valorDomingo: string };
+const duracaoParaForm = (d: DuracaoValor): LinhaDuracao => ({
+  horas: String(d.horas),
+  valor: valorParaCampo(d.valor),
+  valorDomingo: valorParaCampo(d.valorDomingo),
+});
+const DURACOES_PADRAO: LinhaDuracao[] = [
+  { horas: "6", valor: "", valorDomingo: "" },
+  { horas: "8", valor: "", valorDomingo: "" },
+];
 const CAMPOS_COMUNS = [
   ["valorParadaExtra", "Parada extra"],
   ["valorResgate", "Resgate (meia rota)"],
@@ -223,6 +250,9 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
       [...TODOS_CAMPOS_MODELO, ...CAMPOS_COMUNS.map(([k]) => k)].map((k) => [k, valorParaCampo((linha?.[k] as string | null) ?? null)]),
     ),
   }));
+  const [duracoes, setDuracoes] = useState<LinhaDuracao[]>(() =>
+    linha?.duracoes.length ? linha.duracoes.map(duracaoParaForm) : DURACOES_PADRAO,
+  );
   const [erro, setErro] = useState<string | null>(null);
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF((v) => ({ ...v, [k]: e.target.value }));
@@ -241,6 +271,12 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
       const corpo: Record<string, unknown> = { ...f, vigenciaFim: f.vigenciaFim || null };
       for (const k of TODOS_CAMPOS_MODELO) if (!doModelo.has(k)) corpo[k] = null;
       corpo.mediaPacotes = modelo === "ROTA_FIXA" ? f.mediaPacotes || null : null;
+      corpo.duracoes =
+        modelo === "ROTA_HORA"
+          ? duracoes
+              .filter((d) => d.horas || d.valor)
+              .map((d) => ({ horas: d.horas, valor: d.valor || null, valorDomingo: d.valorDomingo || null }))
+          : [];
       return linha
         ? api(`/tabela-valores/${linha.id}`, { method: "PUT", body: corpo })
         : api("/tabela-valores", { method: "POST", body: corpo });
@@ -321,6 +357,7 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
           </select>
         </Campo>
         {CAMPOS_MODELO[modelo].map((c) => campoValor(c as readonly [string, string, string?]))}
+        {modelo === "ROTA_HORA" && <EditorDuracoes linhas={duracoes} aoMudar={setDuracoes} />}
         {modelo === "ROTA_FIXA" && (
           <Campo rotulo="Média de pacotes inclusos" dica="Pacotes cobertos pelo valor da rota">
             <input className="campo text-right" inputMode="numeric" value={f.mediaPacotes} onChange={set("mediaPacotes")} />
@@ -346,6 +383,48 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
   );
 }
 
+// Lista de durações de uma rota ROTA_HORA: a rota principal (ex.: 6h, 8h) e
+// as durações que podem ser pedidas como complemento (ex.: 2h, 4h).
+function EditorDuracoes({ linhas, aoMudar }: { linhas: LinhaDuracao[]; aoMudar: (l: LinhaDuracao[]) => void }) {
+  const mudar = (i: number, k: keyof LinhaDuracao, v: string) =>
+    aoMudar(linhas.map((l, j) => (j === i ? { ...l, [k]: k === "horas" ? v.replace(/\D/g, "") : v } : l)));
+  return (
+    <div className="sm:col-span-3">
+      <span className="mb-1 block text-sm font-medium text-slate-700">Durações e valores (por dia) *</span>
+      <p className="mb-2 text-xs text-slate-500">
+        Cadastre cada duração que pode ser lançada — a rota normal e as que podem ser pedidas como complemento. Valor de
+        domingo em branco = igual aos outros dias.
+      </p>
+      <div className="space-y-2">
+        <div className="grid grid-cols-[5rem_1fr_1fr_2rem] gap-2 text-xs font-medium text-slate-500">
+          <span>Horas</span>
+          <span>Valor (R$)</span>
+          <span>Domingo (R$)</span>
+          <span />
+        </div>
+        {linhas.map((l, i) => (
+          <div key={i} className="grid grid-cols-[5rem_1fr_1fr_2rem] items-center gap-2">
+            <input className="campo text-right" inputMode="numeric" value={l.horas} onChange={(e) => mudar(i, "horas", e.target.value)} placeholder="h" aria-label="Horas" />
+            <input className="campo text-right tabular-nums" inputMode="decimal" value={l.valor} onChange={(e) => mudar(i, "valor", e.target.value)} placeholder="0,00" aria-label="Valor" />
+            <input className="campo text-right tabular-nums" inputMode="decimal" value={l.valorDomingo} onChange={(e) => mudar(i, "valorDomingo", e.target.value)} placeholder="igual" aria-label="Valor no domingo" />
+            <button
+              type="button"
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+              onClick={() => aoMudar(linhas.filter((_, j) => j !== i))}
+              aria-label="Remover duração"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        <Botao variante="secundario" className="px-2.5 py-1.5 text-xs" onClick={() => aoMudar([...linhas, { horas: "", valor: "", valorDomingo: "" }])}>
+          <Plus className="h-3.5 w-3.5" /> Adicionar duração
+        </Botao>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Valor por pacote individual de cada motorista (rotas POR_PACOTE)
 // ---------------------------------------------------------------------------
@@ -368,7 +447,7 @@ function ListaValoresMotorista({
       <p className="border-b border-slate-100 px-4 py-2.5 text-sm text-slate-500">
         Usado nas rotas pagas <strong>por pacote</strong>: quando o motorista tem valor próprio vigente, ele vale no lugar do
         valor padrão da rota. Para mudar o valor de alguém, preencha o fim da vigência atual e cadastre o novo — o histórico fica
-        guardado.
+        guardado. O líder só altera valores da semana atual em diante.
       </p>
       {lista.isLoading ? (
         <Carregando />
@@ -382,6 +461,7 @@ function ListaValoresMotorista({
               <th>Base</th>
               <th>Rota padrão</th>
               <th className="text-right">Valor por pacote</th>
+              <th className="text-right">Domingo</th>
               <th>Vigência</th>
             </tr>
           </thead>
@@ -392,6 +472,7 @@ function ListaValoresMotorista({
                 <td>{v.baseCodigo}</td>
                 <td>{v.rotaPadrao ?? "—"}</td>
                 <td className="text-right tabular-nums">{moeda(v.valorPacote)}</td>
+                <td className="text-right tabular-nums">{v.valorPacoteDomingo ? moeda(v.valorPacoteDomingo) : <span className="text-slate-400">igual</span>}</td>
                 <td className="whitespace-nowrap text-xs">
                   {dataFmt(v.vigenciaInicio)} → {v.vigenciaFim ? dataFmt(v.vigenciaFim) : "atual"}{" "}
                   {vigente(v.vigenciaInicio, v.vigenciaFim) ? <Selo cor="verde">vigente</Selo> : <Selo>histórico</Selo>}
@@ -417,10 +498,14 @@ function FormValorMotorista({
   aoFechar: () => void;
 }) {
   const qc = useQueryClient();
-  const [baseId, setBaseId] = useState(valor ? String(valor.baseId) : baseIdInicial);
+  // Líder com uma base só não precisa escolher.
+  const [baseId, setBaseId] = useState(
+    valor ? String(valor.baseId) : baseIdInicial || (bases.length === 1 ? String(bases[0].id) : ""),
+  );
   const [f, setF] = useState({
     motoristaId: valor ? String(valor.motoristaId) : "",
     valorPacote: valorParaCampo(valor?.valorPacote ?? null),
+    valorPacoteDomingo: valorParaCampo(valor?.valorPacoteDomingo ?? null),
     vigenciaInicio: valor?.vigenciaInicio ?? hojeISO(),
     vigenciaFim: valor?.vigenciaFim ?? "",
     observacoes: valor?.observacoes ?? "",
@@ -441,7 +526,7 @@ function FormValorMotorista({
   };
   const salvar = useMutation({
     mutationFn: () => {
-      const corpo = { ...f, vigenciaFim: f.vigenciaFim || null };
+      const corpo = { ...f, vigenciaFim: f.vigenciaFim || null, valorPacoteDomingo: f.valorPacoteDomingo || null };
       return valor
         ? api(`/valores-motorista/${valor.id}`, { method: "PUT", body: corpo })
         : api("/valores-motorista", { method: "POST", body: corpo });
@@ -506,7 +591,9 @@ function FormValorMotorista({
         <Campo rotulo="Valor por pacote (R$) *">
           <input className="campo text-right tabular-nums" inputMode="decimal" value={f.valorPacote} onChange={set("valorPacote")} placeholder="0,00" />
         </Campo>
-        <div />
+        <Campo rotulo="Valor por pacote no domingo (R$)" dica="Em branco = igual aos outros dias">
+          <input className="campo text-right tabular-nums" inputMode="decimal" value={f.valorPacoteDomingo} onChange={set("valorPacoteDomingo")} placeholder="igual" />
+        </Campo>
         <Campo rotulo="Vigência — início *">
           <input className="campo" type="date" value={f.vigenciaInicio} onChange={set("vigenciaInicio")} />
         </Campo>
