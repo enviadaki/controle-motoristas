@@ -1,22 +1,43 @@
 # Use este override quando for reaproveitar um host que já roda o Nginx
 # Proxy Manager de outro sistema (ex.: romaneio-app-prod) — nesse caso NÃO
 # suba o serviço "npm" deste projeto (ia bater porta 80/443 com o que já tá
-# rodando), e sim publicar a API numa porta só de localhost pro NPM existente
-# apontar pra cá, igual foi feito pro cadastro-app-prod (127.0.0.1:3001).
+# rodando). Em vez de publicar a API numa porta do host, junte o container
+# da API à mesma rede Docker que o NPM já usa, e aponte o Proxy Host direto
+# pro nome do container.
+#
+# Por quê: o NPM roda no próprio container dele, então "127.0.0.1" visto de
+# dentro do NPM é o loopback do NPM, não o do host — publicar a API em
+# 127.0.0.1:PORTA no host não resolve (dá 502 Bad Gateway no NPM). O que
+# funciona é colocar os dois containers na mesma rede Docker e deixar o
+# DNS interno do Docker resolver o nome do container.
+#
+# Como descobrir o nome da rede do NPM existente:
+#   docker network ls | grep proxy
+#   # ou, se souber o nome do projeto do outro sistema (ex.: sistema-romaneio):
+#   docker inspect <nome-do-container-do-npm> --format '{{json .NetworkSettings.Networks}}'
+#
+# Troque "sistema-romaneio_proxy" abaixo pelo nome real dessa rede.
 #
 # Como usar:
 #   cp docker-compose.override.yml.exemplo docker-compose.override.yml
-#   # confira que a porta está livre antes: sudo ss -tlnp | grep 5001
+#   nano docker-compose.override.yml   # ajuste o nome da rede externa
 #   docker compose up -d --build app postgres   # sem o "npm"
 #
 # Depois, no painel do Nginx Proxy Manager já existente (porta 81 da
 # instância), crie um Proxy Host novo:
 #   Domain: controle-motoristas.enviadaki.com.br
-#   Forward Hostname/IP: 127.0.0.1
-#   Forward Port: 5001
+#   Forward Hostname/IP: <nome-do-container-app>   (ex.: controle-motoristas-app-1)
+#   Forward Port: 5000                              (porta interna da API, não publicada no host)
 #   SSL: Let's Encrypt + Force SSL
+#
+# O nome do container pode ser conferido com: docker compose ps
 
 services:
   app:
-    ports:
-      - "127.0.0.1:5001:5000"
+    networks:
+      - interna
+      - sistema-romaneio_proxy   # troque pelo nome real da rede do NPM existente
+
+networks:
+  sistema-romaneio_proxy:
+    external: true
