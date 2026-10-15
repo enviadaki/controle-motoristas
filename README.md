@@ -13,8 +13,8 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 | 0 | Base do sistema: login, perfis, bases, motoristas, tabela de valores, usuários, auditoria | ✅ pronto |
 | 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | ✅ pronto |
 | 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com parcelamento | ✅ pronto |
-| 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | ✅ pronto |
-| 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | ✅ pronto |
+| 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) | ✅ pronto |
+| 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento) + nota fiscal mensal, pronto para o dia 10 | ✅ pronto |
 | 5 | (futuro) Integração via API com o DB Frete | — |
 
 ## Perfis de acesso
@@ -33,8 +33,9 @@ Regras já aplicadas no servidor (não só na tela):
 - Lançamento diário: Administrador, Financeiro e Líder (só das bases dele); a semana fecha sozinha ao virar — líder só edita a semana corrente, Admin/Financeiro corrigem semanas fechadas.
 - Descontos de avaria/extravio: só Administrador e Descontos lançam/editam; Líder só visualiza (da própria base); Financeiro só muda o status (Devido/Pago/Contestado/Cancelado) ao conferir.
 - Parcelamento (desconto com mais de 1x): nasce **pendente**, e só o CFO aprova ou rejeita — nem o Administrador pode (regra pedida explicitamente). Qualquer edição no desconto parcelado (valor, parcelas, motivo) volta o status pra pendente, exige aprovar de novo.
-- Fechamento semanal (Passo 3): Administrador, Financeiro e o próprio Líder (só da sua base) fecham a semana, anexando a nota fiscal — exige o farol **verde**. Reabrir uma semana já fechada é só de Administrador e Financeiro (o líder não reabre sozinho).
+- Fechamento semanal (Passo 3): Administrador, Financeiro e o próprio Líder (só da sua base) fecham a semana — exige só o farol **verde**, sem anexo nenhum (a nota fiscal é mensal, não semanal — ver abaixo). Reabrir uma semana já fechada é só de Administrador e Financeiro (o líder não reabre sozinho).
 - Consolidado do Financeiro (Passo 4): só Administrador e Financeiro enxergam todas as bases juntas.
+- Nota fiscal mensal (Passo 4): Administrador, Financeiro e Líder anexam — o líder só enxerga/anexa pelos responsáveis da própria base; Descontos e CFO não têm acesso a essa tela.
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
@@ -65,9 +66,9 @@ calcula:
 O **farol** fica vermelho (pendência) se: algum motorista que rodou não tem tabela de valor vigente
 batendo (mesmo aviso do Passo 1), ou se existe desconto parcelado **pendente** de aprovação do CFO
 naquela semana — só fica verde quando não sobra nenhuma das duas pendências. Fechar a semana (líder,
-Financeiro ou Administrador) exige o farol verde e a nota fiscal anexada (PDF/PNG/JPG); reabrir uma
-semana já fechada é só de Administrador e Financeiro. O histórico de fechamentos guarda quem fechou,
-quando, e a nota fiscal de cada semana.
+Financeiro ou Administrador) exige só o farol verde — **sem anexo nenhum**: o motorista não tira nota por
+semana, só do acumulado do mês (ver Passo 4). Reabrir uma semana já fechada é só de Administrador e
+Financeiro. O histórico de fechamentos guarda quem fechou e quando.
 
 ### Como funciona o consolidado do Passo 4
 
@@ -80,12 +81,22 @@ valores ficam de fora do total até a semana fechar. Exporta para Excel (planilh
 PIX/favorecido/dados bancários prontos pra conferir, "Por base" com os totais e "Pendências" quando
 houver).
 
+### Nota fiscal mensal (parte do Passo 4)
+
+Diferente do que foi levantado na reunião inicial: o motorista (ou quem recebe por ele) **não** tira
+nota por semana — tira **uma nota só por mês**, do valor acumulado, perto do dia 10. Por isso a nota
+fiscal não trava o fechamento semanal (Passo 3); ela vive numa tela própria ("Notas fiscais do mês"),
+uma linha por (mês, responsável de pagamento), mostrando o acumulado do consolidado ao lado do anexo
+(PDF/PNG/JPG). Quem normalmente anexa é o **líder da base** do responsável — ele só vê/anexa pelos
+responsáveis da própria base; Administrador e Financeiro também podem (por exemplo se o responsável
+atende mais de uma base, ou o líder não conseguiu), vendo todas as bases ou filtrando por uma.
+
 ## Design pensado pro líder
 
 Líder de base é quem mais usa o sistema no dia a dia, muitas vezes pelo celular, e nem sempre é íntimo
 de informática — por isso a tela dele é diferente da do Administrador: em vez de números de cadastro e
-roteiro do projeto, ele cai direto num painel com 3 atalhos grandes ("Lançar hoje", "Ver descontos",
-"Fechamento da semana") e um aviso simples de quem ainda falta lançar. As telas de uso diário
+roteiro do projeto, ele cai direto num painel com 4 atalhos grandes ("Lançar hoje", "Ver descontos",
+"Fechamento da semana", "Notas fiscais do mês") e um aviso simples de quem ainda falta lançar. As telas de uso diário
 (lançamentos, fechamento, descontos) viram cartões empilhados no celular — um por motorista/desconto,
 com rótulo sempre visível acima do campo — em vez de tabela com rolagem lateral; no computador continuam
 como tabela compacta.
@@ -137,7 +148,7 @@ Backup manual do banco:
 docker compose exec postgres pg_dump -U controle controle_motoristas | gzip > backup-$(date +%F).sql.gz
 ```
 
-As notas fiscais anexadas no fechamento (Passo 3) ficam no volume `uploads-data` (montado em
+As notas fiscais mensais anexadas (Passo 4) ficam no volume `uploads-data` (montado em
 `/app/uploads`) — não fazem parte do banco, então o backup acima não inclui elas. Backup do volume:
 
 ```bash

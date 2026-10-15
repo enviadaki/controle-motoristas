@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api, type Consolidado } from "../lib/api";
 import { dataFmt, moeda } from "../lib/format";
 import { Botao, Cabecalho, Carregando, Cartao, Selo, Vazio } from "../components/ui";
@@ -37,9 +38,17 @@ export function Consolidado() {
         titulo="Consolidado do Financeiro"
         descricao="Todas as bases juntas, agrupado por quem recebe o pagamento — pronto para o dia 10."
         acoes={
-          <Botao variante="secundario" onClick={() => window.open(`/api/consolidado/exportar?mes=${mes}`, "_blank")}>
-            <Download className="h-4 w-4" /> Exportar Excel
-          </Botao>
+          <>
+            <Link
+              to="/notas-fiscais"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-4 w-4" /> Notas fiscais
+            </Link>
+            <Botao variante="secundario" onClick={() => window.open(`/api/consolidado/exportar?mes=${mes}`, "_blank")}>
+              <Download className="h-4 w-4" /> Exportar Excel
+            </Botao>
+          </>
         }
       />
 

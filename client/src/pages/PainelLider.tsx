@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, ClipboardList, Lock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, ClipboardList, FileText, Lock } from "lucide-react";
 import { api, type Base, type Motorista, type ResumoFechamento, type SemanaLancamentos } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Cartao, Selo } from "../components/ui";
@@ -133,6 +133,17 @@ export function PainelLider() {
               {fechado ? "fechada" : fechamento.data?.farolVerde ? "confere" : "pendente"}
             </Selo>
           )}
+        </Link>
+
+        <Link
+          to="/notas-fiscais"
+          className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 active:scale-[0.99]"
+        >
+          <FileText className="h-8 w-8 shrink-0 text-slate-500" />
+          <div>
+            <div className="text-base font-semibold text-slate-900">Notas fiscais do mês</div>
+            <div className="text-sm text-slate-500">Anexar a nota do acumulado, perto do dia 10</div>
+          </div>
         </Link>
       </div>
     </div>

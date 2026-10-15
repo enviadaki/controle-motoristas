@@ -264,8 +264,6 @@ export interface RegistroFechamento {
   semanaInicio: string;
   semanaFim: string;
   status: StatusFechamento;
-  notaFiscalArquivo: string | null;
-  notaFiscalNomeOriginal: string | null;
   fechadoPorId: number | null;
   fechadoEm: string | null;
   observacoes: string | null;
@@ -327,6 +325,28 @@ export interface Consolidado {
   pendencias: PendenciaConsolidado[];
 }
 
+// ---- Notas fiscais mensais (anexo do acumulado, 1x por mês perto do dia 10) ----
+
+export interface NotaFiscalMensal {
+  id: number;
+  responsavelId: number;
+  nomeOriginal: string;
+  enviadoEm: string;
+  enviadoPorNome: string | null;
+}
+
+export interface ResponsavelNotaFiscal {
+  responsavelId: number;
+  responsavelNome: string;
+  totalLiquido: number;
+  nota: NotaFiscalMensal | null;
+}
+
+export interface NotasFiscaisMes {
+  mes: string;
+  responsaveis: ResponsavelNotaFiscal[];
+}
+
 export interface FechamentoHistorico {
   id: number;
   baseId: number;
@@ -334,7 +354,6 @@ export interface FechamentoHistorico {
   semanaInicio: string;
   semanaFim: string;
   status: StatusFechamento;
-  notaFiscalNomeOriginal: string | null;
   fechadoPorNome: string | null;
   fechadoEm: string | null;
   observacoes: string | null;

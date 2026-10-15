@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Download, Lock, Unlock, Upload } from "lucide-react";
-import { api, apiUpload, type Base, type FechamentoHistorico, type ResumoFechamento } from "../lib/api";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Lock, Unlock, Upload } from "lucide-react";
+import { api, type Base, type FechamentoHistorico, type ResumoFechamento } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dataFmt, moeda } from "../lib/format";
 import { AvisoErro, Botao, Cabecalho, Carregando, Cartao, Modal, Selo, Vazio } from "../components/ui";
@@ -53,7 +53,7 @@ export function Fechamentos() {
     <>
       <Cabecalho
         titulo="Fechamento semanal"
-        descricao="Confere o farol da semana (operação + descontos) e anexa a nota fiscal pra fechar."
+        descricao="Confere o farol da semana (operação + descontos) pra fechar — a nota fiscal é mensal, lá em Notas fiscais."
         acoes={
           <select className="campo" value={baseId} onChange={(e) => setBaseId(e.target.value)}>
             {basesVisiveis?.map((b) => (
@@ -197,26 +197,9 @@ export function Fechamentos() {
 
           <Cartao className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div className="text-sm text-slate-600">
-              {fechado ? (
-                <>
-                  Fechada em {resumo.data.fechamento?.fechadoEm ? new Date(resumo.data.fechamento.fechadoEm).toLocaleString("pt-BR", { timeZone: "America/Bahia" }) : "—"}.
-                  {resumo.data.fechamento?.notaFiscalNomeOriginal && (
-                    <>
-                      {" "}
-                      <a
-                        className="inline-flex items-center gap-1 text-marca-600 hover:underline"
-                        href={`/api/fechamentos/${resumo.data.fechamento.id}/nota-fiscal`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <Download className="h-3.5 w-3.5" /> {resumo.data.fechamento.notaFiscalNomeOriginal}
-                      </a>
-                    </>
-                  )}
-                </>
-              ) : (
-                "Semana ainda aberta."
-              )}
+              {fechado
+                ? `Fechada em ${resumo.data.fechamento?.fechadoEm ? new Date(resumo.data.fechamento.fechadoEm).toLocaleString("pt-BR", { timeZone: "America/Bahia" }) : "—"}.`
+                : "Semana ainda aberta."}
             </div>
             <div className="flex gap-2">
               {fechado && podeReabrir && (
@@ -264,19 +247,11 @@ function FecharModal({
   aoFechar: () => void;
   aoConcluir: () => void;
 }) {
-  const [arquivo, setArquivo] = useState<File | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
   const fechar = useMutation({
-    mutationFn: () => {
-      const form = new FormData();
-      form.set("baseId", baseId);
-      form.set("data", data);
-      if (observacoes) form.set("observacoes", observacoes);
-      form.set("notaFiscal", arquivo!);
-      return apiUpload("/fechamentos/fechar", form);
-    },
+    mutationFn: () => api("/fechamentos/fechar", { method: "POST", body: { baseId, data, observacoes: observacoes || undefined } }),
     onSuccess: aoConcluir,
     onError: (e: Error) => setErro(e.message),
   });
@@ -289,7 +264,7 @@ function FecharModal({
       rodape={
         <>
           <Botao variante="secundario" onClick={aoFechar}>Cancelar</Botao>
-          <Botao carregando={fechar.isPending} disabled={!arquivo} onClick={() => { setErro(null); fechar.mutate(); }}>
+          <Botao carregando={fechar.isPending} onClick={() => { setErro(null); fechar.mutate(); }}>
             Fechar semana
           </Botao>
         </>
@@ -297,15 +272,9 @@ function FecharModal({
     >
       <AvisoErro>{erro}</AvisoErro>
       <div className="space-y-3">
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-600">Nota fiscal (PDF, PNG ou JPG) *</span>
-          <input
-            className="campo"
-            type="file"
-            accept="application/pdf,image/png,image/jpeg"
-            onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
-          />
-        </label>
+        <p className="text-sm text-slate-600">
+          O farol está verde, pode fechar. A nota fiscal do mês fica em <strong>Notas fiscais</strong> — é só do acumulado, uma vez por mês.
+        </p>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-600">Observações (opcional)</span>
           <textarea className="campo" rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
@@ -352,7 +321,6 @@ export function FechamentosHistorico() {
                 <th>Base</th>
                 <th>Semana</th>
                 <th>Situação</th>
-                <th>Nota fiscal</th>
                 <th>Fechado por</th>
                 <th>Em</th>
               </tr>
@@ -364,13 +332,6 @@ export function FechamentosHistorico() {
                   <td>{dataFmt(f.semanaInicio)} → {dataFmt(f.semanaFim)}</td>
                   <td>
                     {f.status === "FECHADO" ? <Selo cor="verde">Fechada</Selo> : <Selo cor="amarelo">Reaberta</Selo>}
-                  </td>
-                  <td>
-                    {f.notaFiscalNomeOriginal ? (
-                      <a className="inline-flex items-center gap-1 text-marca-600 hover:underline" href={`/api/fechamentos/${f.id}/nota-fiscal`} target="_blank" rel="noreferrer">
-                        <Download className="h-3.5 w-3.5" /> {f.notaFiscalNomeOriginal}
-                      </a>
-                    ) : "—"}
                   </td>
                   <td className="text-slate-600">{f.fechadoPorNome ?? "—"}</td>
                   <td className="text-xs text-slate-500">{f.fechadoEm ? new Date(f.fechadoEm).toLocaleString("pt-BR", { timeZone: "America/Bahia" }) : "—"}</td>

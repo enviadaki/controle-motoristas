@@ -15,6 +15,7 @@ import { Descontos } from "./pages/Descontos";
 import { AprovacaoParcelamentos } from "./pages/AprovacaoParcelamentos";
 import { PainelLider } from "./pages/PainelLider";
 import { Fechamentos, FechamentosHistorico } from "./pages/Fechamentos";
+import { NotasFiscais } from "./pages/NotasFiscais";
 import { Consolidado } from "./pages/Consolidado";
 import { Bases } from "./pages/Bases";
 import { TabelaValores } from "./pages/TabelaValores";
@@ -59,6 +60,7 @@ function Rotas() {
         <Route path="descontos" element={<Descontos />} />
         <Route path="fechamentos" element={<Fechamentos />} />
         <Route path="fechamentos/historico" element={<Protegido perfis={["ADMIN", "FINANCEIRO"]}><FechamentosHistorico /></Protegido>} />
+        <Route path="notas-fiscais" element={<Protegido perfis={["ADMIN", "FINANCEIRO", "LIDER"]}><NotasFiscais /></Protegido>} />
         <Route path="consolidado" element={<Protegido perfis={["ADMIN", "FINANCEIRO"]}><Consolidado /></Protegido>} />
         <Route path="motoristas" element={<Motoristas />} />
         <Route path="tabela-valores" element={<TabelaValores />} />

@@ -283,9 +283,11 @@ export const descontos = pgTable(
 // ---------------------------------------------------------------------------
 // Fechamento semanal por base (Passo 3) — reúne o resumo do Passo 1
 // (lançamentos) com os descontos aprovados da semana (Passo 2) num farol
-// (verde = confere, vermelho = tem pendência) e guarda a nota fiscal anexada
-// pelo líder ao fechar. Uma linha por (base, semana); farol é calculado na
-// hora (lib/fechamento.ts), não fica guardado — só o status/arquivo final.
+// (verde = confere, vermelho = tem pendência). Uma linha por (base, semana);
+// farol é calculado na hora (lib/fechamento.ts), não fica guardado — só o
+// status final. A nota fiscal NÃO entra aqui: o motorista só tira a nota do
+// acumulado 1x por mês, perto do dia 10 — isso fica no Passo 4
+// (notasFiscaisMensais, por responsável de pagamento).
 // ---------------------------------------------------------------------------
 
 export const STATUS_FECHAMENTO = ["ABERTO", "FECHADO"] as const;
@@ -301,14 +303,36 @@ export const fechamentosSemanais = pgTable(
     semanaInicio: date("semana_inicio").notNull(),
     semanaFim: date("semana_fim").notNull(),
     status: text("status").$type<StatusFechamento>().notNull().default("ABERTO"),
-    notaFiscalArquivo: text("nota_fiscal_arquivo"), // caminho relativo dentro de UPLOADS_DIR
-    notaFiscalNomeOriginal: text("nota_fiscal_nome_original"),
     fechadoPorId: integer("fechado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
     fechadoEm: timestamp("fechado_em", { withTimezone: true }),
     observacoes: text("observacoes"),
     ...timestamps,
   },
   (t) => [uniqueIndex("fechamentos_base_semana_unique").on(t.baseId, t.semanaInicio)],
+);
+
+// ---------------------------------------------------------------------------
+// Nota fiscal mensal por responsável de pagamento (Passo 4) — cada motorista
+// (ou quem recebe por ele) tira uma nota só, do acumulado do mês, perto do
+// dia 10. Uma linha por (mês, responsável); quem anexa normalmente é o
+// líder da base do responsável, mas Financeiro/Admin também podem.
+// ---------------------------------------------------------------------------
+
+export const notasFiscaisMensais = pgTable(
+  "notas_fiscais_mensais",
+  {
+    id: serial("id").primaryKey(),
+    mes: text("mes").notNull(), // "AAAA-MM"
+    responsavelId: integer("responsavel_id")
+      .notNull()
+      .references(() => motoristas.id),
+    arquivo: text("arquivo").notNull(), // caminho relativo dentro de UPLOADS_DIR
+    nomeOriginal: text("nome_original").notNull(),
+    enviadoPorId: integer("enviado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
+    enviadoEm: timestamp("enviado_em", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("notas_fiscais_mes_responsavel_unique").on(t.mes, t.responsavelId)],
 );
 
 // ---------------------------------------------------------------------------

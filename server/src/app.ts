@@ -16,6 +16,7 @@ import { usuariosRouter } from "./routes/usuarios.js";
 import { auditoriaRouter } from "./routes/auditoria.js";
 import { fechamentosRouter } from "./routes/fechamentos.js";
 import { consolidadoRouter } from "./routes/consolidado.js";
+import { notasFiscaisRouter } from "./routes/notas-fiscais.js";
 import { definirPastaUploads } from "./lib/uploads.js";
 
 // Mensagens de validação em português.
@@ -41,6 +42,7 @@ export function criarApp(opcoes: { pastaFrontend?: string; pastaUploads?: string
   app.use("/api/descontos", requireAuth, descontosRouter);
   app.use("/api/fechamentos", requireAuth, fechamentosRouter);
   app.use("/api/consolidado", requireAuth, consolidadoRouter);
+  app.use("/api/notas-fiscais", requireAuth, notasFiscaisRouter);
   app.use("/api/tabela-valores", requireAuth, tabelaValoresRouter);
   app.use("/api/usuarios", requireAuth, requirePerfil("ADMIN"), usuariosRouter);
   app.use("/api/auditoria", requireAuth, requirePerfil("ADMIN"), auditoriaRouter);

@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bases, fechamentosSemanais, motoristas } from "../db/schema.js";
 import { calcularResumoFechamento } from "./fechamento.js";
@@ -55,9 +55,12 @@ export interface Consolidado {
   pendencias: PendenciaConsolidado[];
 }
 
-export async function calcularConsolidado(mes: string): Promise<Consolidado> {
+// baseIds: quando informado, restringe o cálculo a essas bases (usado pelo
+// líder, que só pode ver a própria base nas notas fiscais mensais).
+export async function calcularConsolidado(mes: string, baseIds?: number[]): Promise<Consolidado> {
   const semanas = semanasDoMes(mes);
-  const todasBases = await db.select().from(bases).where(eq(bases.ativo, true));
+  const condBases = baseIds ? and(eq(bases.ativo, true), inArray(bases.id, baseIds)) : eq(bases.ativo, true);
+  const todasBases = await db.select().from(bases).where(condBases);
 
   const responsavelAlias = alias(motoristas, "responsavel_pagamento");
   const todosMotoristas = await db
