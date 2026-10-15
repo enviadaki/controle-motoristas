@@ -125,6 +125,8 @@ DATABASE_URL=... pnpm db:generate
 
 ## Produção (EC2, mesmo procedimento das outras instâncias)
 
+Instância **dedicada e nova** (sobe seu próprio Nginx Proxy Manager):
+
 ```bash
 git clone https://github.com/enviadaki/controle-motoristas.git && cd controle-motoristas
 cp .env.example .env && nano .env    # senhas fortes; JWT_SECRET com: openssl rand -hex 32
@@ -135,6 +137,21 @@ docker compose exec -e ADMIN_NOME="Rafael Bezerra" -e ADMIN_EMAIL=rafael@enviada
 
 No Nginx Proxy Manager (porta 81): Proxy Host `controle-motoristas.enviadaki.com.br` → `app` porta `5000`,
 com SSL Let's Encrypt e Force SSL. Depois feche a porta 81 no Security Group.
+
+**Reaproveitando um host que já roda outro sistema** (ex.: `romaneio-app-prod`, que já tem um Nginx
+Proxy Manager rodando pra outro domínio): não suba o serviço `npm` deste projeto — ele bateria nas
+portas 80/443 já ocupadas. Use o override de exemplo:
+
+```bash
+git clone https://github.com/enviadaki/controle-motoristas.git && cd controle-motoristas
+cp .env.example .env && nano .env
+cp docker-compose.override.yml.exemplo docker-compose.override.yml   # publica a API só em 127.0.0.1:5001
+docker compose up -d --build app postgres    # sem o "npm"
+docker compose exec -e ADMIN_NOME="Rafael Bezerra" -e ADMIN_EMAIL=rafael@enviadaki.com.br -e ADMIN_SENHA='senha-forte' app node dist/db/seed.js
+```
+
+Depois, no NPM já existente da instância, crie um Proxy Host novo para `controle-motoristas.enviadaki.com.br`
+apontando para `127.0.0.1:5001`, com SSL Let's Encrypt e Force SSL.
 
 Atualizar após um merge na `main`:
 
