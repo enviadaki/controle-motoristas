@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { AlertTriangle, Building2, CheckSquare, ClipboardCheck, ClipboardList, History, Home, KeyRound, LogOut, Menu, Table2, Truck, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CheckSquare, ClipboardCheck, ClipboardList, History, Home, KeyRound, LogOut, Menu, PiggyBank, Table2, Truck, Users, X } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { ROTULO_PERFIL, type Perfil } from "../lib/api";
 
@@ -22,6 +22,7 @@ const MENU: { grupo: string; itens: ItemMenu[] }[] = [
       { para: "/aprovacoes", rotulo: "Aprovação de parcelamentos", icone: CheckSquare, perfis: ["CFO", "ADMIN"] },
       { para: "/fechamentos", rotulo: "Fechamento semanal", icone: ClipboardCheck },
       { para: "/fechamentos/historico", rotulo: "Histórico de fechamentos", icone: History, perfis: ["ADMIN", "FINANCEIRO"] },
+      { para: "/consolidado", rotulo: "Consolidado do Financeiro", icone: PiggyBank, perfis: ["ADMIN", "FINANCEIRO"] },
     ],
   },
   {

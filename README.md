@@ -14,7 +14,7 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 | 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | ✅ pronto |
 | 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com parcelamento | ✅ pronto |
 | 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | ✅ pronto |
-| 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | — |
+| 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | ✅ pronto |
 | 5 | (futuro) Integração via API com o DB Frete | — |
 
 ## Perfis de acesso
@@ -34,6 +34,7 @@ Regras já aplicadas no servidor (não só na tela):
 - Descontos de avaria/extravio: só Administrador e Descontos lançam/editam; Líder só visualiza (da própria base); Financeiro só muda o status (Devido/Pago/Contestado/Cancelado) ao conferir.
 - Parcelamento (desconto com mais de 1x): nasce **pendente**, e só o CFO aprova ou rejeita — nem o Administrador pode (regra pedida explicitamente). Qualquer edição no desconto parcelado (valor, parcelas, motivo) volta o status pra pendente, exige aprovar de novo.
 - Fechamento semanal (Passo 3): Administrador, Financeiro e o próprio Líder (só da sua base) fecham a semana, anexando a nota fiscal — exige o farol **verde**. Reabrir uma semana já fechada é só de Administrador e Financeiro (o líder não reabre sozinho).
+- Consolidado do Financeiro (Passo 4): só Administrador e Financeiro enxergam todas as bases juntas.
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
@@ -67,6 +68,17 @@ naquela semana — só fica verde quando não sobra nenhuma das duas pendências
 Financeiro ou Administrador) exige o farol verde e a nota fiscal anexada (PDF/PNG/JPG); reabrir uma
 semana já fechada é só de Administrador e Financeiro. O histórico de fechamentos guarda quem fechou,
 quando, e a nota fiscal de cada semana.
+
+### Como funciona o consolidado do Passo 4
+
+Junta os fechamentos semanais de **todas as bases** dentro de um mês — uma semana entra no mês em que
+cai sua segunda-feira, mesmo que o domingo já seja do mês seguinte — e agrupa o líquido por quem
+efetivamente recebe o pagamento: o `responsavelPagamentoId` do motorista (campo do cadastro), ou o
+próprio motorista quando não tem um responsável diferente dele. Mostra o que já tiver, mesmo com semana
+pendente de fechar — a lista de pendências deixa claro o que ainda falta fechar por base/semana, e esses
+valores ficam de fora do total até a semana fechar. Exporta para Excel (planilha "Pagamento" com
+PIX/favorecido/dados bancários prontos pra conferir, "Por base" com os totais e "Pendências" quando
+houver).
 
 ## Stack
 

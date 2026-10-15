@@ -284,6 +284,49 @@ export interface ResumoFechamento {
   fechamento: RegistroFechamento | null;
 }
 
+// ---- Passo 4: consolidado do Financeiro ----
+
+export interface MotoristaConsolidado {
+  motoristaId: number;
+  motoristaNome: string;
+  baseId: number;
+  baseCodigo: string;
+  totalLiquido: number;
+}
+
+export interface ResponsavelConsolidado {
+  responsavelId: number;
+  responsavelNome: string;
+  chavePix: string | null;
+  favorecido: string | null;
+  dadosBancarios: string | null;
+  motoristas: MotoristaConsolidado[];
+  totalLiquido: number;
+}
+
+export interface BaseConsolidado {
+  baseId: number;
+  baseCodigo: string;
+  totalLiquido: number;
+}
+
+export interface PendenciaConsolidado {
+  baseId: number;
+  baseCodigo: string;
+  semanaInicio: string;
+  semanaFim: string;
+  motivo: string;
+}
+
+export interface Consolidado {
+  mes: string;
+  semanas: string[];
+  responsaveis: ResponsavelConsolidado[];
+  porBase: BaseConsolidado[];
+  totalGeral: number;
+  pendencias: PendenciaConsolidado[];
+}
+
 export interface FechamentoHistorico {
   id: number;
   baseId: number;

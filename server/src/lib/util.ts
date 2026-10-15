@@ -77,6 +77,20 @@ export function semanaAtual(): InfoSemana {
   return semanaDe(hojeISO());
 }
 
+// Semanas (segunda-feira) de um mês "AAAA-MM" — pro consolidado mensal
+// (Passo 4): uma semana entra no mês em que sua segunda-feira cai, mesmo que
+// o domingo já seja do mês seguinte (critério combinado com o Rafael).
+export function semanasDoMes(mes: string): string[] {
+  const [ano, m] = mes.split("-").map(Number);
+  const ultimoDia = new Date(Date.UTC(ano, m, 0)).getUTCDate();
+  const segundas: string[] = [];
+  for (let dia = 1; dia <= ultimoDia; dia++) {
+    const d = new Date(Date.UTC(ano, m - 1, dia));
+    if (d.getUTCDay() === 1) segundas.push(paraISO(d));
+  }
+  return segundas;
+}
+
 // A semana fecha sozinha ao virar a próxima: líder só lança/edita dias da
 // semana corrente. Admin/Financeiro podem corrigir semanas já fechadas.
 export function semanaFechada(dataISO: string): boolean {
