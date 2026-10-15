@@ -13,6 +13,7 @@ import { Motoristas } from "./pages/Motoristas";
 import { Lancamentos } from "./pages/Lancamentos";
 import { Descontos } from "./pages/Descontos";
 import { AprovacaoParcelamentos } from "./pages/AprovacaoParcelamentos";
+import { PainelLider } from "./pages/PainelLider";
 import { Fechamentos, FechamentosHistorico } from "./pages/Fechamentos";
 import { Consolidado } from "./pages/Consolidado";
 import { Bases } from "./pages/Bases";
@@ -36,7 +37,9 @@ function Protegido({ perfis, children }: { perfis?: Perfil[]; children: React.Re
 function Rotas() {
   const { usuario, carregando } = useAuth();
   // CFO (Linsmar) é o único que autoriza parcelamento — a primeira tela dele
-  // ao entrar é a fila de aprovação, não o painel geral.
+  // ao entrar é a fila de aprovação, não o painel geral. Líder também tem
+  // tela própria: atalhos grandes pro dia a dia, sem números de cadastro
+  // nem roteiro do projeto (ver PainelLider).
   return (
     <Routes>
       <Route path="/login" element={!carregando && usuario ? <Navigate to="/" replace /> : <Login />} />
@@ -47,7 +50,10 @@ function Rotas() {
           </Protegido>
         }
       >
-        <Route index element={usuario?.perfil === "CFO" ? <AprovacaoParcelamentos /> : <Inicio />} />
+        <Route
+          index
+          element={usuario?.perfil === "CFO" ? <AprovacaoParcelamentos /> : usuario?.perfil === "LIDER" ? <PainelLider /> : <Inicio />}
+        />
         <Route path="aprovacoes" element={<Protegido perfis={["CFO", "ADMIN"]}><AprovacaoParcelamentos /></Protegido>} />
         <Route path="lancamentos" element={<Lancamentos />} />
         <Route path="descontos" element={<Descontos />} />

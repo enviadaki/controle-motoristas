@@ -80,6 +80,16 @@ valores ficam de fora do total até a semana fechar. Exporta para Excel (planilh
 PIX/favorecido/dados bancários prontos pra conferir, "Por base" com os totais e "Pendências" quando
 houver).
 
+## Design pensado pro líder
+
+Líder de base é quem mais usa o sistema no dia a dia, muitas vezes pelo celular, e nem sempre é íntimo
+de informática — por isso a tela dele é diferente da do Administrador: em vez de números de cadastro e
+roteiro do projeto, ele cai direto num painel com 3 atalhos grandes ("Lançar hoje", "Ver descontos",
+"Fechamento da semana") e um aviso simples de quem ainda falta lançar. As telas de uso diário
+(lançamentos, fechamento, descontos) viram cartões empilhados no celular — um por motorista/desconto,
+com rótulo sempre visível acima do campo — em vez de tabela com rolagem lateral; no computador continuam
+como tabela compacta.
+
 ## Stack
 
 Mesma do Sistema de Romaneios: Node.js 22 + TypeScript, Express 5, PostgreSQL 16 + Drizzle ORM,

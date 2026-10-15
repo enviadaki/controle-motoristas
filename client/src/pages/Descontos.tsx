@@ -94,73 +94,123 @@ export function Descontos() {
           onChange={(e) => setBusca(e.target.value)}
         />
       </Cartao>
-      <Cartao className="overflow-x-auto">
-        {lista.isLoading ? (
-          <Carregando />
-        ) : !lista.data?.length ? (
-          <Vazio>Nenhum desconto lançado ainda.</Vazio>
-        ) : (
-          <table className="tabela w-full min-w-[980px]">
-            <thead>
-              <tr>
-                <th>Base</th>
-                <th>Responsável</th>
-                <th>Motivo</th>
-                <th>Ação</th>
-                <th className="text-right">Valor</th>
-                <th>Período</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.data.map((d) => (
-                <tr key={d.id}>
-                  <td className="font-medium">{d.baseCodigo}</td>
-                  <td>
-                    {d.nomeResponsavel}
-                    {d.parcelas > 1 && <span className="ml-1 text-xs text-slate-400">({d.parcelaAtual}/{d.parcelas})</span>}
-                    {d.statusParcelamento && (
-                      <Selo cor={CORES_PARCELAMENTO[d.statusParcelamento]}>{ROTULO_STATUS_PARCELAMENTO[d.statusParcelamento]}</Selo>
-                    )}
-                    {d.tbr && <div className="text-xs text-slate-400">{d.tbr}</div>}
-                  </td>
-                  <td className="max-w-xs truncate" title={d.motivo}>{d.motivo}</td>
-                  <td className="text-xs">{ROTULO_ACAO[d.acao]}</td>
-                  <td className="text-right tabular-nums">{moeda(d.valor)}</td>
-                  <td className="whitespace-nowrap text-xs">
-                    {d.periodoApuracao}
-                    {d.mesCobranca && <div className="text-slate-400">{dataFmt(d.mesCobranca)}</div>}
-                    {d.semanaReferencia && <div className="text-slate-400">Semana {dataFmt(d.semanaReferencia)}</div>}
-                  </td>
-                  <td>
-                    {podeEditar || tem("FINANCEIRO") ? (
-                      <select
-                        className="campo py-1 text-xs"
-                        value={d.status}
-                        onChange={(e) => marcarStatus.mutate({ id: d.id, status: e.target.value as StatusDesconto })}
-                      >
-                        {STATUS_DESCONTO.map((s) => (
-                          <option key={s} value={s}>{ROTULO_STATUS_DESCONTO[s]}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <Selo cor={CORES_STATUS[d.status]}>{ROTULO_STATUS_DESCONTO[d.status]}</Selo>
-                    )}
-                  </td>
-                  <td>
-                    {podeEditar && (
-                      <button className="text-xs text-marca-700 hover:underline" onClick={() => setEditando(d)}>
-                        Editar
-                      </button>
-                    )}
-                  </td>
+      {lista.isLoading ? (
+        <Cartao><Carregando /></Cartao>
+      ) : !lista.data?.length ? (
+        <Cartao><Vazio>Nenhum desconto lançado ainda.</Vazio></Cartao>
+      ) : (
+        <>
+          {/* Telas largas: tabela compacta */}
+          <Cartao className="hidden overflow-x-auto sm:block">
+            <table className="tabela w-full min-w-[980px]">
+              <thead>
+                <tr>
+                  <th>Base</th>
+                  <th>Responsável</th>
+                  <th>Motivo</th>
+                  <th>Ação</th>
+                  <th className="text-right">Valor</th>
+                  <th>Período</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Cartao>
+              </thead>
+              <tbody>
+                {lista.data.map((d) => (
+                  <tr key={d.id}>
+                    <td className="font-medium">{d.baseCodigo}</td>
+                    <td>
+                      {d.nomeResponsavel}
+                      {d.parcelas > 1 && <span className="ml-1 text-xs text-slate-400">({d.parcelaAtual}/{d.parcelas})</span>}
+                      {d.statusParcelamento && (
+                        <Selo cor={CORES_PARCELAMENTO[d.statusParcelamento]}>{ROTULO_STATUS_PARCELAMENTO[d.statusParcelamento]}</Selo>
+                      )}
+                      {d.tbr && <div className="text-xs text-slate-400">{d.tbr}</div>}
+                    </td>
+                    <td className="max-w-xs truncate" title={d.motivo}>{d.motivo}</td>
+                    <td className="text-xs">{ROTULO_ACAO[d.acao]}</td>
+                    <td className="text-right tabular-nums">{moeda(d.valor)}</td>
+                    <td className="whitespace-nowrap text-xs">
+                      {d.periodoApuracao}
+                      {d.mesCobranca && <div className="text-slate-400">{dataFmt(d.mesCobranca)}</div>}
+                      {d.semanaReferencia && <div className="text-slate-400">Semana {dataFmt(d.semanaReferencia)}</div>}
+                    </td>
+                    <td>
+                      {podeEditar || tem("FINANCEIRO") ? (
+                        <select
+                          className="campo py-1 text-xs"
+                          value={d.status}
+                          onChange={(e) => marcarStatus.mutate({ id: d.id, status: e.target.value as StatusDesconto })}
+                        >
+                          {STATUS_DESCONTO.map((s) => (
+                            <option key={s} value={s}>{ROTULO_STATUS_DESCONTO[s]}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Selo cor={CORES_STATUS[d.status]}>{ROTULO_STATUS_DESCONTO[d.status]}</Selo>
+                      )}
+                    </td>
+                    <td>
+                      {podeEditar && (
+                        <button className="text-xs text-marca-700 hover:underline" onClick={() => setEditando(d)}>
+                          Editar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Cartao>
+
+          {/* Celular: um cartão por desconto */}
+          <div className="space-y-3 sm:hidden">
+            {lista.data.map((d) => (
+              <Cartao key={d.id} className="p-3.5">
+                <div className="mb-1.5 flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-medium">{d.nomeResponsavel}</span>
+                    <span className="ml-1.5 text-xs text-slate-400">{d.baseCodigo}</span>
+                    {d.parcelas > 1 && <span className="ml-1 text-xs text-slate-400">({d.parcelaAtual}/{d.parcelas})</span>}
+                  </div>
+                  <span className="shrink-0 font-semibold tabular-nums">{moeda(d.valor)}</span>
+                </div>
+                {d.statusParcelamento && (
+                  <div className="mb-1.5">
+                    <Selo cor={CORES_PARCELAMENTO[d.statusParcelamento]}>{ROTULO_STATUS_PARCELAMENTO[d.statusParcelamento]}</Selo>
+                  </div>
+                )}
+                <div className="text-sm text-slate-600">{d.motivo}</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {ROTULO_ACAO[d.acao]}
+                  {d.tbr && ` · ${d.tbr}`}
+                  {d.semanaReferencia && ` · Semana ${dataFmt(d.semanaReferencia)}`}
+                </div>
+                <div className="mt-2.5 flex items-center justify-between">
+                  {podeEditar || tem("FINANCEIRO") ? (
+                    <select
+                      className="campo py-1 text-xs"
+                      value={d.status}
+                      onChange={(e) => marcarStatus.mutate({ id: d.id, status: e.target.value as StatusDesconto })}
+                    >
+                      {STATUS_DESCONTO.map((s) => (
+                        <option key={s} value={s}>{ROTULO_STATUS_DESCONTO[s]}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Selo cor={CORES_STATUS[d.status]}>{ROTULO_STATUS_DESCONTO[d.status]}</Selo>
+                  )}
+                  {podeEditar && (
+                    <button className="text-xs text-marca-700 hover:underline" onClick={() => setEditando(d)}>
+                      Editar
+                    </button>
+                  )}
+                </div>
+              </Cartao>
+            ))}
+          </div>
+        </>
+      )}
       {editando && (
         <FormDesconto desconto={editando === "novo" ? null : editando} bases={bases.data ?? []} aoFechar={() => setEditando(null)} />
       )}

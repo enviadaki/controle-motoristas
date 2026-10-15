@@ -122,43 +122,63 @@ export function Lancamentos() {
         )}
       </Cartao>
 
-      <Cartao className="overflow-x-auto">
-        {!baseId ? (
-          <Vazio>Selecione uma base.</Vazio>
-        ) : motoristas.isLoading || semana.isLoading ? (
-          <Carregando />
-        ) : !motoristas.data?.length ? (
-          <Vazio>Nenhum motorista ativo nesta base.</Vazio>
-        ) : (
-          <table className="tabela w-full min-w-[920px]">
-            <thead>
-              <tr>
-                <th>Motorista</th>
-                <th className="text-center">Rodou</th>
-                <th className="text-right">Entregues</th>
-                <th className="text-right">Insucesso</th>
-                <th className="text-right">Paradas extra</th>
-                <th className="text-right">Resgates</th>
-                <th>Observação</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {motoristas.data.map((m) => (
-                <LinhaLancamento
-                  key={m.id}
-                  motorista={m}
-                  data={data}
-                  lancamento={porMotoristaNaData.get(m.id)}
-                  travado={travado}
-                  aoSalvar={() => qc.invalidateQueries({ queryKey: ["lancamentos"] })}
-                  aoVerResumo={() => setResumoMotoristaId(m.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Cartao>
+      {!baseId ? (
+        <Cartao><Vazio>Selecione uma base.</Vazio></Cartao>
+      ) : motoristas.isLoading || semana.isLoading ? (
+        <Cartao><Carregando /></Cartao>
+      ) : !motoristas.data?.length ? (
+        <Cartao><Vazio>Nenhum motorista ativo nesta base.</Vazio></Cartao>
+      ) : (
+        <>
+          {/* Telas largas: tabela compacta */}
+          <Cartao className="hidden overflow-x-auto sm:block">
+            <table className="tabela w-full min-w-[920px]">
+              <thead>
+                <tr>
+                  <th>Motorista</th>
+                  <th className="text-center">Rodou</th>
+                  <th className="text-right">Entregues</th>
+                  <th className="text-right">Insucesso</th>
+                  <th className="text-right">Paradas extra</th>
+                  <th className="text-right">Resgates</th>
+                  <th>Observação</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {motoristas.data.map((m) => (
+                  <LinhaLancamento
+                    key={m.id}
+                    modo="tabela"
+                    motorista={m}
+                    data={data}
+                    lancamento={porMotoristaNaData.get(m.id)}
+                    travado={travado}
+                    aoSalvar={() => qc.invalidateQueries({ queryKey: ["lancamentos"] })}
+                    aoVerResumo={() => setResumoMotoristaId(m.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </Cartao>
+
+          {/* Celular: um cartão por motorista, campos com rótulo à vista */}
+          <div className="space-y-3 sm:hidden">
+            {motoristas.data.map((m) => (
+              <LinhaLancamento
+                key={m.id}
+                modo="cartao"
+                motorista={m}
+                data={data}
+                lancamento={porMotoristaNaData.get(m.id)}
+                travado={travado}
+                aoSalvar={() => qc.invalidateQueries({ queryKey: ["lancamentos"] })}
+                aoVerResumo={() => setResumoMotoristaId(m.id)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {resumoMotoristaId && (
         <ResumoSemanaModal motoristaId={resumoMotoristaId} data={data} aoFechar={() => setResumoMotoristaId(null)} />
@@ -174,6 +194,7 @@ function LinhaLancamento({
   travado,
   aoSalvar,
   aoVerResumo,
+  modo,
 }: {
   motorista: Motorista;
   data: string;
@@ -181,6 +202,7 @@ function LinhaLancamento({
   travado: boolean;
   aoSalvar: () => void;
   aoVerResumo: () => void;
+  modo: "tabela" | "cartao";
 }) {
   const [f, setF] = useState<LinhaForm>(() => linhaParaForm(lancamento));
   const [sujo, setSujo] = useState(false);
@@ -214,6 +236,52 @@ function LinhaLancamento({
     setF((prev) => ({ ...prev, [v]: e.target.value.replace(/\D/g, "") }));
     setSujo(true);
   };
+
+  if (modo === "cartao") {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <button className="text-left text-base font-medium hover:underline" onClick={aoVerResumo}>
+            {motorista.nome}
+          </button>
+          <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={f.rodou}
+              disabled={travado}
+              onChange={(e) => {
+                setF((prev) => ({ ...prev, rodou: e.target.checked }));
+                setSujo(true);
+              }}
+            />
+            Rodou
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <CampoCartao rotulo="Entregues" value={f.pacotesEntregues} disabled={travado} onChange={num("pacotesEntregues")} />
+          <CampoCartao rotulo="Insucesso" value={f.pacotesInsucesso} disabled={travado} onChange={num("pacotesInsucesso")} />
+          <CampoCartao rotulo="Paradas extra" value={f.paradasExtras} disabled={travado} onChange={num("paradasExtras")} />
+          <CampoCartao rotulo="Resgates" value={f.resgates} disabled={travado} onChange={num("resgates")} />
+        </div>
+        <input
+          className="campo mt-2.5 w-full"
+          disabled={travado}
+          value={f.observacoes}
+          placeholder="Observação (opcional)"
+          onChange={(e) => {
+            setF((prev) => ({ ...prev, observacoes: e.target.value }));
+            setSujo(true);
+          }}
+        />
+        {!travado && (
+          <Botao className="mt-2.5 w-full" disabled={!sujo} carregando={salvar.isPending} onClick={() => salvar.mutate()}>
+            Salvar
+          </Botao>
+        )}
+      </div>
+    );
+  }
 
   return (
     <tr>
@@ -322,5 +390,26 @@ function ResumoSemanaModal({ motoristaId, data, aoFechar }: { motoristaId: numbe
         </div>
       )}
     </Modal>
+  );
+}
+
+// Campo numérico com rótulo sempre visível acima — no modo cartão, não dá pra
+// contar com cabeçalho de coluna distante do valor como na tabela.
+function CampoCartao({
+  rotulo,
+  value,
+  disabled,
+  onChange,
+}: {
+  rotulo: string;
+  value: string;
+  disabled: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-xs font-medium text-slate-500">{rotulo}</span>
+      <input className="campo text-right tabular-nums" inputMode="numeric" disabled={disabled} value={value} onChange={onChange} />
+    </label>
   );
 }

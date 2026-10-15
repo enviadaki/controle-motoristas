@@ -95,61 +95,105 @@ export function Fechamentos() {
         <Cartao><Vazio>Não foi possível calcular o fechamento.</Vazio></Cartao>
       ) : (
         <>
-          <Cartao className="mb-4 overflow-x-auto">
-            <table className="tabela w-full min-w-[760px]">
-              <thead>
-                <tr>
-                  <th>Motorista</th>
-                  <th className="text-right">Dias rodados</th>
-                  <th className="text-right">Valor operacional</th>
-                  <th className="text-right">Descontos</th>
-                  <th className="text-right">Líquido</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {resumo.data.linhas.map((l) => (
-                  <tr key={l.motoristaId}>
-                    <td className="font-medium">{l.motoristaNome}</td>
-                    <td className="text-right tabular-nums">
-                      {l.resumo.diasTrabalhados}
-                      {l.resumo.trabalhouDomingo && " +dom"}
-                    </td>
-                    <td className="text-right tabular-nums">{moeda(l.resumo.valorTotal)}</td>
-                    <td className="text-right tabular-nums text-red-600">{l.descontosAplicados > 0 ? `− ${moeda(l.descontosAplicados)}` : "—"}</td>
-                    <td className="text-right font-semibold tabular-nums">{moeda(l.totalLiquido)}</td>
-                    <td className="whitespace-nowrap text-xs">
-                      {l.temPendenciaValor && (
-                        <span className="inline-flex items-center gap-1 text-amber-700">
-                          <AlertTriangle className="h-3.5 w-3.5" /> {l.resumo.avisoValor}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!resumo.data.linhas.length && (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-sm text-slate-500">Nenhum motorista ativo nesta base.</td>
-                  </tr>
+          {!resumo.data.linhas.length ? (
+            <Cartao className="mb-4"><Vazio>Nenhum motorista ativo nesta base.</Vazio></Cartao>
+          ) : (
+            <>
+              {/* Telas largas: tabela compacta */}
+              <Cartao className="mb-4 hidden overflow-x-auto sm:block">
+                <table className="tabela w-full min-w-[760px]">
+                  <thead>
+                    <tr>
+                      <th>Motorista</th>
+                      <th className="text-right">Dias rodados</th>
+                      <th className="text-right">Valor operacional</th>
+                      <th className="text-right">Descontos</th>
+                      <th className="text-right">Líquido</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumo.data.linhas.map((l) => (
+                      <tr key={l.motoristaId}>
+                        <td className="font-medium">{l.motoristaNome}</td>
+                        <td className="text-right tabular-nums">
+                          {l.resumo.diasTrabalhados}
+                          {l.resumo.trabalhouDomingo && " +dom"}
+                        </td>
+                        <td className="text-right tabular-nums">{moeda(l.resumo.valorTotal)}</td>
+                        <td className="text-right tabular-nums text-red-600">{l.descontosAplicados > 0 ? `− ${moeda(l.descontosAplicados)}` : "—"}</td>
+                        <td className="text-right font-semibold tabular-nums">{moeda(l.totalLiquido)}</td>
+                        <td className="whitespace-nowrap text-xs">
+                          {l.temPendenciaValor && (
+                            <span className="inline-flex items-center gap-1 text-amber-700">
+                              <AlertTriangle className="h-3.5 w-3.5" /> {l.resumo.avisoValor}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="font-semibold">
+                      <td>Total</td>
+                      <td></td>
+                      <td className="text-right tabular-nums">{moeda(resumo.data.totalOperacional)}</td>
+                      <td className="text-right tabular-nums text-red-600">{resumo.data.totalDescontos > 0 ? `− ${moeda(resumo.data.totalDescontos)}` : "—"}</td>
+                      <td className="text-right tabular-nums">{moeda(resumo.data.totalLiquido)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+                {resumo.data.descontosPendentes > 0 && (
+                  <div className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                    {resumo.data.descontosPendentes} desconto(s) parcelado(s) ainda aguardando aprovação do CFO nesta semana — não entraram na conta.
+                  </div>
                 )}
-              </tbody>
-              <tfoot>
-                <tr className="font-semibold">
-                  <td>Total</td>
-                  <td></td>
-                  <td className="text-right tabular-nums">{moeda(resumo.data.totalOperacional)}</td>
-                  <td className="text-right tabular-nums text-red-600">{resumo.data.totalDescontos > 0 ? `− ${moeda(resumo.data.totalDescontos)}` : "—"}</td>
-                  <td className="text-right tabular-nums">{moeda(resumo.data.totalLiquido)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-            {resumo.data.descontosPendentes > 0 && (
-              <div className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                {resumo.data.descontosPendentes} desconto(s) parcelado(s) ainda aguardando aprovação do CFO nesta semana — não entraram na conta.
+              </Cartao>
+
+              {/* Celular: um cartão por motorista */}
+              <div className="mb-4 space-y-2.5 sm:hidden">
+                {resumo.data.linhas.map((l) => (
+                  <Cartao key={l.motoristaId} className="p-3.5">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="font-medium">{l.motoristaNome}</span>
+                      <span className="text-xs text-slate-500">
+                        {l.resumo.diasTrabalhados} dia(s){l.resumo.trabalhouDomingo && " +dom"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Operacional</span>
+                      <span className="tabular-nums">{moeda(l.resumo.valorTotal)}</span>
+                    </div>
+                    {l.descontosAplicados > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Descontos</span>
+                        <span className="tabular-nums text-red-600">− {moeda(l.descontosAplicados)}</span>
+                      </div>
+                    )}
+                    <div className="mt-1 flex justify-between border-t border-slate-100 pt-1 text-sm font-semibold">
+                      <span>Líquido</span>
+                      <span className="tabular-nums">{moeda(l.totalLiquido)}</span>
+                    </div>
+                    {l.temPendenciaValor && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {l.resumo.avisoValor}
+                      </div>
+                    )}
+                  </Cartao>
+                ))}
+                <Cartao className="flex justify-between p-3.5 font-semibold">
+                  <span>Total</span>
+                  <span className="tabular-nums">{moeda(resumo.data.totalLiquido)}</span>
+                </Cartao>
+                {resumo.data.descontosPendentes > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {resumo.data.descontosPendentes} desconto(s) parcelado(s) ainda aguardando aprovação do CFO — não entraram na conta.
+                  </div>
+                )}
               </div>
-            )}
-          </Cartao>
+            </>
+          )}
 
           <Cartao className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div className="text-sm text-slate-600">
