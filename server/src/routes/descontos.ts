@@ -35,6 +35,7 @@ const colunasLista = {
   motivoRejeicaoParcelamento: descontos.motivoRejeicaoParcelamento,
   periodoApuracao: descontos.periodoApuracao,
   mesCobranca: descontos.mesCobranca,
+  semanaReferencia: descontos.semanaReferencia,
   origem: descontos.origem,
   status: descontos.status,
   observacoes: descontos.observacoes,
@@ -55,6 +56,7 @@ const filtrosSchema = z.object({
   motoristaId: z.coerce.number().int().positive().optional(),
   status: z.enum(STATUS_DESCONTO).optional(),
   statusParcelamento: z.enum(STATUS_PARCELAMENTO).optional(),
+  semanaReferencia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   busca: z.string().trim().optional(), // nome do responsável, TBR ou motivo
 });
 
@@ -69,6 +71,7 @@ descontosRouter.get("/", async (req, res) => {
   if (f.motoristaId) cond.push(eq(descontos.motoristaId, f.motoristaId));
   if (f.status) cond.push(eq(descontos.status, f.status));
   if (f.statusParcelamento) cond.push(eq(descontos.statusParcelamento, f.statusParcelamento));
+  if (f.semanaReferencia) cond.push(eq(descontos.semanaReferencia, f.semanaReferencia));
   if (f.busca) {
     const termo = `%${f.busca}%`;
     cond.push(or(ilike(descontos.nomeResponsavel, termo), ilike(descontos.tbr, termo), ilike(descontos.motivo, termo))!);
@@ -103,6 +106,9 @@ const descontoSchema = z.object({
   parcelaAtual: z.coerce.number().int().min(1).default(1),
   periodoApuracao: textoOpcional,
   mesCobranca: dataISO.nullish().transform((v) => v ?? null),
+  // Segunda-feira da semana (seg.–dom.) do fechamento ao qual esse desconto
+  // deve entrar (Passo 3). Opcional — sem isso o desconto fica só registrado.
+  semanaReferencia: dataISO.nullish().transform((v) => v ?? null),
   origem: textoOpcional,
   status: z.enum(STATUS_DESCONTO).default("DEVIDO"),
   observacoes: textoOpcional,

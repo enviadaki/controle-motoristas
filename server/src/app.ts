@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import cookieParser from "cookie-parser";
 import path from "node:path";
 import fs from "node:fs";
+import { MulterError } from "multer";
 import { z, ZodError } from "zod";
 import { pool } from "./db/index.js";
 import { requireAuth, requirePerfil } from "./lib/auth.js";
@@ -13,12 +14,15 @@ import { descontosRouter } from "./routes/descontos.js";
 import { tabelaValoresRouter } from "./routes/tabela-valores.js";
 import { usuariosRouter } from "./routes/usuarios.js";
 import { auditoriaRouter } from "./routes/auditoria.js";
+import { fechamentosRouter } from "./routes/fechamentos.js";
+import { definirPastaUploads } from "./lib/uploads.js";
 
 // Mensagens de validação em português.
 z.config(z.locales.ptBR());
 
-export function criarApp(opcoes: { pastaFrontend?: string } = {}) {
+export function criarApp(opcoes: { pastaFrontend?: string; pastaUploads?: string } = {}) {
   const app = express();
+  definirPastaUploads(opcoes.pastaUploads ?? path.resolve("uploads"));
   app.set("trust proxy", 1); // atrás do Nginx Proxy Manager
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
@@ -34,6 +38,7 @@ export function criarApp(opcoes: { pastaFrontend?: string } = {}) {
   app.use("/api/motoristas", requireAuth, motoristasRouter);
   app.use("/api/lancamentos", requireAuth, lancamentosRouter);
   app.use("/api/descontos", requireAuth, descontosRouter);
+  app.use("/api/fechamentos", requireAuth, fechamentosRouter);
   app.use("/api/tabela-valores", requireAuth, tabelaValoresRouter);
   app.use("/api/usuarios", requireAuth, requirePerfil("ADMIN"), usuariosRouter);
   app.use("/api/auditoria", requireAuth, requirePerfil("ADMIN"), auditoriaRouter);
@@ -48,6 +53,10 @@ export function criarApp(opcoes: { pastaFrontend?: string } = {}) {
   }
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof MulterError) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "Arquivo muito grande (máx. 15MB)" : "Falha ao enviar o arquivo";
+      return res.status(400).json({ erro: msg });
+    }
     if (err instanceof ZodError) {
       const primeira = err.issues[0];
       return res.status(400).json({

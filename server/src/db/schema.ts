@@ -262,6 +262,10 @@ export const descontos = pgTable(
     motivoRejeicaoParcelamento: text("motivo_rejeicao_parcelamento"),
     periodoApuracao: text("periodo_apuracao"), // ex.: "SEMANA 35" (texto livre, como vem da planilha)
     mesCobranca: date("mes_cobranca"),
+    // Segunda-feira da semana (seg.–dom., mesmo calendário do Passo 1) em que
+    // esse desconto deve entrar no fechamento. Opcional — sem isso o desconto
+    // fica só registrado, sem puxar pra nenhum fechamento (Passo 3).
+    semanaReferencia: date("semana_referencia"),
     origem: text("origem"), // LOST / DNR / BONUS / OUTRO
     status: text("status").$type<StatusDesconto>().notNull().default("DEVIDO"),
     observacoes: text("observacoes"),
@@ -272,7 +276,39 @@ export const descontos = pgTable(
     index("descontos_base_idx").on(t.baseId),
     index("descontos_motorista_idx").on(t.motoristaId),
     index("descontos_status_parcelamento_idx").on(t.statusParcelamento),
+    index("descontos_semana_referencia_idx").on(t.baseId, t.semanaReferencia),
   ],
+);
+
+// ---------------------------------------------------------------------------
+// Fechamento semanal por base (Passo 3) — reúne o resumo do Passo 1
+// (lançamentos) com os descontos aprovados da semana (Passo 2) num farol
+// (verde = confere, vermelho = tem pendência) e guarda a nota fiscal anexada
+// pelo líder ao fechar. Uma linha por (base, semana); farol é calculado na
+// hora (lib/fechamento.ts), não fica guardado — só o status/arquivo final.
+// ---------------------------------------------------------------------------
+
+export const STATUS_FECHAMENTO = ["ABERTO", "FECHADO"] as const;
+export type StatusFechamento = (typeof STATUS_FECHAMENTO)[number];
+
+export const fechamentosSemanais = pgTable(
+  "fechamentos_semanais",
+  {
+    id: serial("id").primaryKey(),
+    baseId: integer("base_id")
+      .notNull()
+      .references(() => bases.id),
+    semanaInicio: date("semana_inicio").notNull(),
+    semanaFim: date("semana_fim").notNull(),
+    status: text("status").$type<StatusFechamento>().notNull().default("ABERTO"),
+    notaFiscalArquivo: text("nota_fiscal_arquivo"), // caminho relativo dentro de UPLOADS_DIR
+    notaFiscalNomeOriginal: text("nota_fiscal_nome_original"),
+    fechadoPorId: integer("fechado_por_id").references(() => usuarios.id, { onDelete: "set null" }),
+    fechadoEm: timestamp("fechado_em", { withTimezone: true }),
+    observacoes: text("observacoes"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("fechamentos_base_semana_unique").on(t.baseId, t.semanaInicio)],
 );
 
 // ---------------------------------------------------------------------------

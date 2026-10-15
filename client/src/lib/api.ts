@@ -24,6 +24,17 @@ export async function api<T = unknown>(caminho: string, opcoes: { method?: strin
   return dados as T;
 }
 
+// Envio multipart (upload de arquivo) — usado só pelo fechamento (nota fiscal).
+export async function apiUpload<T = unknown>(caminho: string, dados: FormData): Promise<T> {
+  const res = await fetch(`/api${caminho}`, { method: "POST", credentials: "include", body: dados });
+  const corpo = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event("sessao-expirada"));
+    throw new ErroApi(corpo.erro ?? `Erro ${res.status}`, res.status, corpo.campo, corpo.detalhes ?? []);
+  }
+  return corpo as T;
+}
+
 // ---- Tipos compartilhados com a API ----
 
 export type Perfil = "ADMIN" | "DESCONTOS" | "LIDER" | "FINANCEIRO" | "CFO";
@@ -228,8 +239,61 @@ export interface Desconto {
   motivoRejeicaoParcelamento: string | null;
   periodoApuracao: string | null;
   mesCobranca: string | null;
+  semanaReferencia: string | null;
   origem: string | null;
   status: StatusDesconto;
+  observacoes: string | null;
+}
+
+// ---- Passo 3: fechamento semanal com farol ----
+
+export type StatusFechamento = "ABERTO" | "FECHADO";
+
+export interface LinhaFecho {
+  motoristaId: number;
+  motoristaNome: string;
+  resumo: ResumoSemana;
+  descontosAplicados: number;
+  totalLiquido: number;
+  temPendenciaValor: boolean;
+}
+
+export interface RegistroFechamento {
+  id: number;
+  baseId: number;
+  semanaInicio: string;
+  semanaFim: string;
+  status: StatusFechamento;
+  notaFiscalArquivo: string | null;
+  notaFiscalNomeOriginal: string | null;
+  fechadoPorId: number | null;
+  fechadoEm: string | null;
+  observacoes: string | null;
+}
+
+export interface ResumoFechamento {
+  baseId: number;
+  semanaInicio: string;
+  semanaFim: string;
+  linhas: LinhaFecho[];
+  totalOperacional: number;
+  totalDescontos: number;
+  totalLiquido: number;
+  descontosPendentes: number;
+  farolVerde: boolean;
+  fechamento: RegistroFechamento | null;
+}
+
+export interface FechamentoHistorico {
+  id: number;
+  baseId: number;
+  baseCodigo: string;
+  semanaInicio: string;
+  semanaFim: string;
+  status: StatusFechamento;
+  notaFiscalNomeOriginal: string | null;
+  fechadoPorNome: string | null;
+  fechadoEm: string | null;
   observacoes: string | null;
 }
 

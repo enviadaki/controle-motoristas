@@ -12,8 +12,8 @@ Domínio previsto: `controle-motoristas.enviadaki.com.br`
 |---|---|---|
 | 0 | Base do sistema: login, perfis, bases, motoristas, tabela de valores, usuários, auditoria | ✅ pronto |
 | 1 | Lançamento diário de rota pelo líder (substitui a planilha da base), com valor calculado pela tabela | ✅ pronto |
-| 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com parcelamento | ✅ pronto (evidência/anexo ainda não) |
-| 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | — |
+| 2 | Descontos de avaria/extravio lançados pela área de Descontos, travados para o líder, com parcelamento | ✅ pronto |
+| 3 | Fechamento automático por base com farol (verde = confere / vermelho = pendente) + nota fiscal anexada | ✅ pronto |
 | 4 | Consolidado do Financeiro (todas as bases, por responsável de pagamento, pronto para o dia 10) | — |
 | 5 | (futuro) Integração via API com o DB Frete | — |
 
@@ -33,6 +33,7 @@ Regras já aplicadas no servidor (não só na tela):
 - Lançamento diário: Administrador, Financeiro e Líder (só das bases dele); a semana fecha sozinha ao virar — líder só edita a semana corrente, Admin/Financeiro corrigem semanas fechadas.
 - Descontos de avaria/extravio: só Administrador e Descontos lançam/editam; Líder só visualiza (da própria base); Financeiro só muda o status (Devido/Pago/Contestado/Cancelado) ao conferir.
 - Parcelamento (desconto com mais de 1x): nasce **pendente**, e só o CFO aprova ou rejeita — nem o Administrador pode (regra pedida explicitamente). Qualquer edição no desconto parcelado (valor, parcelas, motivo) volta o status pra pendente, exige aprovar de novo.
+- Fechamento semanal (Passo 3): Administrador, Financeiro e o próprio Líder (só da sua base) fecham a semana, anexando a nota fiscal — exige o farol **verde**. Reabrir uma semana já fechada é só de Administrador e Financeiro (o líder não reabre sozinho).
 - Tabela de valores, bases e usuários: só Administrador.
 - Usuário desativado perde o acesso na hora (a sessão é validada no banco a cada requisição).
 - Toda criação/edição/exclusão e todo login ficam registrados na **Auditoria**, com valores antes/depois.
@@ -46,11 +47,26 @@ média inclusa geram adicional por unidade; cada **pacote em insucesso desconta 
 Paradas extras e resgates também somam. Tudo isso vem da **tabela de valores**, casando base + tipo de
 veículo + rota padrão do motorista (campo "Rota padrão" no cadastro precisa bater com a "Cidade/rota" da
 tabela de valores); se não achar (ou achar mais de uma vigente) o sistema avisa em vez de calcular errado.
-Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) ainda entram por
-fora: hoje o Passo 2 lança e acompanha o status de cada desconto, mas o resumo da semana do Passo 1 não
-soma esse valor automaticamente ainda (fica para o fechamento do Passo 3, onde os dois se encontram). Um
-desconto parcelado também só deve valer depois que o CFO aprovar — isso ainda vai precisar ser respeitado
-quando o Passo 3 somar os descontos no fechamento.
+Isto é só o lado operacional — os descontos de avaria/extravio da Flávia (Passo 2) entram por fora, e se
+encontram com ele no fechamento (Passo 3).
+
+### Como funciona o fechamento do Passo 3
+
+Cada desconto pode apontar uma **semana de referência** (a segunda-feira da semana seg.–dom., mesmo
+calendário do Passo 1) — é o que liga o desconto ao fechamento certo. Pra cada base+semana, o sistema
+calcula:
+
+- o valor operacional de cada motorista ativo (o mesmo cálculo do Passo 1);
+- os descontos daquela semana que já podem ser cobrados: sem parcelamento, ou parcelados e **aprovados**
+  pelo CFO (um parcelado **rejeitado** não desconta nada, e um **pendente** ainda não entra na conta);
+- o líquido de cada motorista = operacional − descontos aplicáveis (nunca negativo).
+
+O **farol** fica vermelho (pendência) se: algum motorista que rodou não tem tabela de valor vigente
+batendo (mesmo aviso do Passo 1), ou se existe desconto parcelado **pendente** de aprovação do CFO
+naquela semana — só fica verde quando não sobra nenhuma das duas pendências. Fechar a semana (líder,
+Financeiro ou Administrador) exige o farol verde e a nota fiscal anexada (PDF/PNG/JPG); reabrir uma
+semana já fechada é só de Administrador e Financeiro. O histórico de fechamentos guarda quem fechou,
+quando, e a nota fiscal de cada semana.
 
 ## Stack
 
@@ -97,6 +113,14 @@ Backup manual do banco:
 
 ```bash
 docker compose exec postgres pg_dump -U controle controle_motoristas | gzip > backup-$(date +%F).sql.gz
+```
+
+As notas fiscais anexadas no fechamento (Passo 3) ficam no volume `uploads-data` (montado em
+`/app/uploads`) — não fazem parte do banco, então o backup acima não inclui elas. Backup do volume:
+
+```bash
+docker run --rm -v controle-motoristas_uploads-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/uploads-$(date +%F).tar.gz -C /data .
 ```
 
 ## Fluxo de trabalho no código

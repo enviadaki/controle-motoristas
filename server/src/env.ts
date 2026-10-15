@@ -16,4 +16,9 @@ export const env = {
   },
 };
 
+// Pasta onde ficam as notas fiscais anexadas no fechamento (Passo 3). Em
+// produção é um volume Docker persistente; em dev, uma pasta local ignorada
+// pelo git.
+export const UPLOADS_DIR = process.env.UPLOADS_DIR ?? "uploads";
+
 export const isProd = env.NODE_ENV === "production";

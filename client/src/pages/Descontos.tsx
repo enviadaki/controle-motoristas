@@ -131,6 +131,7 @@ export function Descontos() {
                   <td className="whitespace-nowrap text-xs">
                     {d.periodoApuracao}
                     {d.mesCobranca && <div className="text-slate-400">{dataFmt(d.mesCobranca)}</div>}
+                    {d.semanaReferencia && <div className="text-slate-400">Semana {dataFmt(d.semanaReferencia)}</div>}
                   </td>
                   <td>
                     {podeEditar || tem("FINANCEIRO") ? (
@@ -182,6 +183,7 @@ function FormDesconto({ desconto, bases, aoFechar }: { desconto: Desconto | null
     parcelaAtual: String(desconto?.parcelaAtual ?? 1),
     periodoApuracao: desconto?.periodoApuracao ?? "",
     mesCobranca: desconto?.mesCobranca ?? "",
+    semanaReferencia: desconto?.semanaReferencia ?? "",
     origem: desconto?.origem ?? "",
     observacoes: desconto?.observacoes ?? "",
   }));
@@ -205,6 +207,7 @@ function FormDesconto({ desconto, bases, aoFechar }: { desconto: Desconto | null
         ...f,
         motoristaId: f.tipoResponsavel === "MOTORISTA" && f.motoristaId ? f.motoristaId : null,
         mesCobranca: f.mesCobranca || null,
+        semanaReferencia: f.semanaReferencia || null,
       };
       return desconto ? api(`/descontos/${desconto.id}`, { method: "PUT", body: corpo }) : api("/descontos", { method: "POST", body: corpo });
     },
@@ -299,6 +302,9 @@ function FormDesconto({ desconto, bases, aoFechar }: { desconto: Desconto | null
         </Campo>
         <Campo rotulo="Mês de cobrança">
           <input className="campo" type="date" value={f.mesCobranca} onChange={set("mesCobranca")} />
+        </Campo>
+        <Campo rotulo="Semana do fechamento" dica="Segunda-feira da semana (Passo 3) a que esse desconto pertence">
+          <input className="campo" type="date" value={f.semanaReferencia} onChange={set("semanaReferencia")} />
         </Campo>
         <Campo rotulo="Observações" className="sm:col-span-3">
           <input className="campo" value={f.observacoes} onChange={set("observacoes")} />

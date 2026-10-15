@@ -18,12 +18,13 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=5000 \
     FRONTEND_DIR=/app/public \
-    MIGRATIONS_DIR=/app/drizzle
+    MIGRATIONS_DIR=/app/drizzle \
+    UPLOADS_DIR=/app/uploads
 COPY --from=build /app/server/dist ./dist
 COPY --from=build /app/server/drizzle ./drizzle
 COPY --from=build /app/client/dist ./public
 COPY deploy/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown -R node:node /app
+RUN mkdir -p /app/uploads && chmod +x /entrypoint.sh && chown -R node:node /app
 USER node
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

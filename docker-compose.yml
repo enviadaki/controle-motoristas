@@ -30,6 +30,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL no .env}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       TZ: America/Bahia
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,5 +55,6 @@ networks:
 
 volumes:
   postgres-data:
+  uploads-data:
   npm-data:
   npm-letsencrypt:
