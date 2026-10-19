@@ -130,6 +130,18 @@ function valorPrincipal(l: LinhaValor) {
           {l.valorParadaDomingo && <span className="block text-xs text-slate-500">dom. {moeda(l.valorParadaDomingo)}</span>}
         </>
       );
+    case "DIARIA":
+      return (
+        <>
+          {moeda(l.valorRotaSemana)}/dia
+          {l.valorRotaDomingo && <span className="block text-xs text-slate-500">dom. {moeda(l.valorRotaDomingo)}</span>}
+          {l.valorParadaExtra && l.mediaPacotes != null && (
+            <span className="block text-xs text-slate-500">
+              +{moeda(l.valorParadaExtra)}/parada acima de {l.mediaPacotes}
+            </span>
+          )}
+        </>
+      );
     case "ROTA_HORA":
       return l.duracoes.map((d) => (
         <span key={d.horas} className="block">
@@ -214,6 +226,11 @@ const CAMPOS_MODELO: Record<ModeloCalculo, (readonly [keyof LinhaValor, string, 
     ["valorParadaDomingo", "Valor por parada no domingo", "Em branco = igual aos outros dias"],
   ],
   ROTA_HORA: [], // durações têm editor próprio (lista)
+  DIARIA: [
+    ["valorRotaSemana", "Diária seg. a sáb. *"],
+    ["valorRotaDomingo", "Diária dom./feriado", "Em branco = igual à diária normal"],
+    ["valorPacoteDevolucao", "Por pacote entregue se devolução > 70%", "Nesse dia não paga a diária, só este valor × entregues"],
+  ],
 };
 
 type LinhaDuracao = { horas: string; valor: string; valorDomingo: string };
@@ -270,7 +287,7 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
       const doModelo = new Set<string>(CAMPOS_MODELO[modelo].map(([k]) => k));
       const corpo: Record<string, unknown> = { ...f, vigenciaFim: f.vigenciaFim || null };
       for (const k of TODOS_CAMPOS_MODELO) if (!doModelo.has(k)) corpo[k] = null;
-      corpo.mediaPacotes = modelo === "ROTA_FIXA" ? f.mediaPacotes || null : null;
+      corpo.mediaPacotes = modelo === "ROTA_FIXA" || modelo === "DIARIA" ? f.mediaPacotes || null : null;
       corpo.duracoes =
         modelo === "ROTA_HORA"
           ? duracoes
@@ -363,11 +380,20 @@ function FormValor({ linha, bases, aoFechar }: { linha: LinhaValor | null; bases
             <input className="campo text-right" inputMode="numeric" value={f.mediaPacotes} onChange={set("mediaPacotes")} />
           </Campo>
         )}
+        {modelo === "DIARIA" && (
+          <Campo rotulo="Paradas inclusas na diária (por dia)" dica="Acima disso paga a 'Parada extra' abaixo, por parada">
+            <input className="campo text-right" inputMode="numeric" value={f.mediaPacotes} onChange={set("mediaPacotes")} />
+          </Campo>
+        )}
 
         <div className="sm:col-span-3 border-t border-slate-100 pt-2 text-xs font-medium uppercase tracking-wide text-slate-400">
           Valem em qualquer modelo
         </div>
-        {CAMPOS_COMUNS.map((c) => campoValor(c))}
+        {CAMPOS_COMUNS.map((c) =>
+          modelo === "DIARIA" && c[0] === "valorParadaExtra"
+            ? campoValor([c[0], "Parada acima do limite do dia"])
+            : campoValor(c),
+        )}
 
         <Campo rotulo="Vigência — início *">
           <input className="campo" type="date" value={f.vigenciaInicio} onChange={set("vigenciaInicio")} />

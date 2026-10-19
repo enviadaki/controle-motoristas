@@ -97,7 +97,7 @@ export const ROTULO_STATUS_PARCELAMENTO: Record<StatusParcelamento, string> = {
   APROVADO: "Aprovado",
   REJEITADO: "Rejeitado",
 };
-export type ModeloCalculo = "ROTA_FIXA" | "POR_PACOTE" | "POR_PARADA" | "ROTA_HORA";
+export type ModeloCalculo = "ROTA_FIXA" | "POR_PACOTE" | "POR_PARADA" | "ROTA_HORA" | "DIARIA";
 export interface ModeloMotorista {
   modelo: ModeloCalculo | null;
   duracoes: number[]; // horas cadastradas (só em ROTA_HORA)
@@ -107,18 +107,20 @@ export interface DuracaoValor {
   valor: string;
   valorDomingo: string | null;
 }
-export const MODELOS_CALCULO: ModeloCalculo[] = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA"];
+export const MODELOS_CALCULO: ModeloCalculo[] = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA", "DIARIA"];
 export const ROTULO_MODELO: Record<ModeloCalculo, string> = {
   ROTA_FIXA: "Rota fixa (semana)",
   POR_PACOTE: "Por pacote",
   POR_PARADA: "Por parada",
   ROTA_HORA: "Rota por duração (horas)",
+  DIARIA: "Diária + excedente de paradas",
 };
 export const DICA_MODELO: Record<ModeloCalculo, string> = {
   ROTA_FIXA: "Valor fixo pela semana se rodou; + domingo, pacotes acima da média e adicional.",
   POR_PACOTE: "Pacotes entregues × valor por pacote. O valor individual do motorista (se cadastrado) tem prioridade sobre o da rota.",
   POR_PARADA: "Paradas feitas × valor por parada.",
   ROTA_HORA: "Cada dia rodado vale o valor da duração que o líder marcar (6h, 8h...), mais o complemento, se pedirem uma rota extra no dia.",
+  DIARIA: "Cada dia rodado paga a diária + paradas acima do limite do dia. Dia com mais de 70% da carga devolvida paga só R$ por pacote entregue.",
 };
 
 export const ROTULO_VEICULO: Record<TipoVeiculo, string> = {
@@ -192,6 +194,7 @@ export interface LinhaValor {
   valorAdicional: string | null;
   valorPacoteExtra: string | null;
   valorParadaExtra: string | null;
+  valorPacoteDevolucao: string | null;
   valorResgate: string | null;
   valorDescontoInsucesso: string | null;
   vigenciaInicio: string;

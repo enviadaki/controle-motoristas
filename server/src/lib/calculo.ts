@@ -31,7 +31,14 @@ import { semanaDe } from "./util.js";
 //     - Cada dia rodado vale o valor da duração que o líder marcou (6h, 8h...,
 //       cadastradas por rota em tabela_valores_duracoes) + o valor do
 //       complemento, se pediram uma rota extra de outra duração no dia.
-//   Domingo nos três modelos acima: se houver valor de domingo cadastrado, ele
+//   DIARIA:
+//     - Cada dia rodado paga a diária (valorRotaSemana seg.–sáb.; domingo usa
+//       valorRotaDomingo, ou a mesma diária se vazio) + paradas do DIA acima do
+//       limite (mediaPacotes) × valorParadaExtra.
+//     - Dia com devolução acima de 70% da carga (insucesso ÷ (entregues +
+//       insucesso)) NÃO paga a diária nem o excedente: paga só os pacotes
+//       entregues × valorPacoteDevolucao (se a rota tiver esse valor).
+//   Domingo nos três modelos por unidade (pacote, parada, hora): se houver valor de domingo cadastrado, ele
 //   vale no domingo; em branco, domingo vale igual aos outros dias. No POR_PACOTE
 //   a ordem é: domingo do motorista > domingo da rota > valor normal do dia.
 //
@@ -172,10 +179,14 @@ export async function calcularSemanaMotorista(motoristaId: number, dataRef: stri
     itensProducao.push(...agrupar.itens());
   } else if (modelo === "ROTA_HORA") {
     itensProducao.push(...(await producaoPorDuracao(tv!, trabalhados, avisos)));
+  } else if (modelo === "DIARIA") {
+    itensProducao.push(...producaoDiaria(tv!, trabalhados, avisos));
   }
 
   const valorProducao = arred(itensProducao.reduce((acc, i) => acc + i.total, 0));
-  const valorParadasExtra = paradasExtras * n(tv?.valorParadaExtra);
+  // Na DIARIA o excedente de paradas já saiu da produção, dia a dia (acima do
+  // limite do dia) — não soma de novo pelas "paradas extras" lançadas à mão.
+  const valorParadasExtra = modelo === "DIARIA" ? 0 : paradasExtras * n(tv?.valorParadaExtra);
   const valorResgates = resgates * n(tv?.valorResgate);
   const valorDescontoInsucesso = pacotesInsucesso * n(tv?.valorDescontoInsucesso);
 
@@ -305,6 +316,35 @@ async function producaoPorDuracao(
   }
   if (semDuracao > 0) avisos.push(`${semDuracao} dia(s) rodado(s) sem a duração da rota informada`);
   for (const h of semValor) avisos.push(`Sem valor cadastrado para rota de ${h}h nesta rota`);
+  return agrupar.itens();
+}
+
+// Dia com mais de 70% da carga devolvida (insucesso) é "devolução alta".
+export const LIMITE_DEVOLUCAO = 0.7;
+
+// DIARIA: cada dia rodado vale a diária + paradas acima do limite do dia; no
+// dia de devolução alta vale só os pacotes entregues × valor de devolução.
+function producaoDiaria(tv: LinhaTabela, trabalhados: (typeof lancamentos.$inferSelect)[], avisos: string[]): ItemProducao[] {
+  const agrupar = new Agrupador();
+  const limite = tv.mediaPacotes;
+  if (tv.valorRotaSemana == null) avisos.push("Rota diária sem valor da diária cadastrado");
+  if (tv.valorParadaExtra != null && limite == null) avisos.push("Rota diária sem limite de paradas inclusas — excedente não calculado");
+  let diasSemParadas = 0;
+  for (const d of trabalhados) {
+    const carga = d.pacotesEntregues + d.pacotesInsucesso;
+    const domingo = ehDomingo(d.data);
+    if (tv.valorPacoteDevolucao != null && carga > 0 && d.pacotesInsucesso / carga > LIMITE_DEVOLUCAO) {
+      agrupar.somar("Pacotes entregues em dia de devolução acima de 70%", d.pacotesEntregues, Number(tv.valorPacoteDevolucao));
+      continue;
+    }
+    const diaria = domingo && tv.valorRotaDomingo != null ? tv.valorRotaDomingo : tv.valorRotaSemana;
+    if (diaria != null) agrupar.somar(domingo && tv.valorRotaDomingo != null ? "Diária (domingo/feriado)" : "Diária", 1, Number(diaria));
+    if (d.paradas === 0 && d.pacotesEntregues > 0) diasSemParadas++;
+    if (limite != null && tv.valorParadaExtra != null && d.paradas > limite) {
+      agrupar.somar(`Paradas acima de ${limite} no dia`, d.paradas - limite, Number(tv.valorParadaExtra));
+    }
+  }
+  if (diasSemParadas > 0) avisos.push(`${diasSemParadas} dia(s) rodado(s) sem o total de paradas informado — excedente não calculado`);
   return agrupar.itens();
 }
 

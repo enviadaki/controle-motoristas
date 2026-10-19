@@ -1,0 +1,1 @@
+ALTER TABLE "tabela_valores" ADD COLUMN "valor_pacote_devolucao" numeric(12, 2);
