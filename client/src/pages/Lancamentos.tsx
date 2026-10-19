@@ -64,6 +64,7 @@ const CAMPOS_POR_MODELO: Record<ModeloCalculo, CampoNum[]> = {
   POR_PACOTE: ["pacotesEntregues", "pacotesInsucesso", "paradasExtras", "resgates"],
   POR_PARADA: ["paradas", "pacotesEntregues", "pacotesInsucesso", "resgates"],
   ROTA_HORA: ["horasRota", "horasComplemento", "pacotesEntregues", "pacotesInsucesso", "paradasExtras", "resgates"],
+  DIARIA: ["paradas", "pacotesEntregues", "pacotesInsucesso", "resgates"],
 };
 const ROTULO_CAMPO: Record<CampoNum, string> = {
   horasRota: "Rota (horas)",
@@ -80,6 +81,7 @@ const MODELO_CURTO: Record<ModeloCalculo, string> = {
   POR_PACOTE: "por pacote",
   POR_PARADA: "por parada",
   ROTA_HORA: "por duração",
+  DIARIA: "diária",
 };
 const camposDo = (modelo: ModeloCalculo | null | undefined) => CAMPOS_POR_MODELO[modelo ?? "ROTA_FIXA"];
 

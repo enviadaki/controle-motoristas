@@ -47,9 +47,13 @@ export type StatusMotorista = (typeof STATUS_MOTORISTA)[number];
 // ROTA_HORA   -> valor fixo por dia conforme a duração da rota (6h, 8h...), com
 //                as durações e valores cadastrados por rota (tabela_valores_duracoes)
 //                e um complemento opcional de outra duração no mesmo dia.
+// DIARIA      -> cada dia rodado paga a diária (seg.–sáb. ou dom./feriado) + um valor
+//                por parada acima do limite de paradas inclusas NO DIA. Se mais de
+//                70% da carga do dia voltou (insucesso), o dia não paga a diária:
+//                paga só valorPacoteDevolucao × pacotes entregues. Ex.: Amazon VDC.
 // Nos modelos por unidade, o valor de domingo é opcional: em branco, domingo
 // vale igual aos outros dias.
-export const MODELOS_CALCULO = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA"] as const;
+export const MODELOS_CALCULO = ["ROTA_FIXA", "POR_PACOTE", "POR_PARADA", "ROTA_HORA", "DIARIA"] as const;
 export type ModeloCalculo = (typeof MODELOS_CALCULO)[number];
 
 const timestamps = {
@@ -180,6 +184,7 @@ export const tabelaValores = pgTable(
     valorAdicional: dinheiro("valor_adicional"),
     valorPacoteExtra: dinheiro("valor_pacote_extra"),
     valorParadaExtra: dinheiro("valor_parada_extra"),
+    valorPacoteDevolucao: dinheiro("valor_pacote_devolucao"), // DIARIA: por pacote entregue em dia de devolução alta
     valorResgate: dinheiro("valor_resgate"), // meia rota
     valorDescontoInsucesso: dinheiro("valor_desconto_insucesso"),
     vigenciaInicio: date("vigencia_inicio").notNull(),

@@ -50,6 +50,13 @@
       "when": 1792086506363,
       "tag": "0006_modelos_calculo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792419288786,
+      "tag": "0007_modelo_diaria",
+      "breakpoints": true
     }
   ]
 }

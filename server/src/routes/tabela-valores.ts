@@ -29,6 +29,7 @@ const { createdAt: _c, updatedAt: _u, ...tabelaValoresColunas } = {
   valorAdicional: tabelaValores.valorAdicional,
   valorPacoteExtra: tabelaValores.valorPacoteExtra,
   valorParadaExtra: tabelaValores.valorParadaExtra,
+  valorPacoteDevolucao: tabelaValores.valorPacoteDevolucao,
   valorResgate: tabelaValores.valorResgate,
   valorDescontoInsucesso: tabelaValores.valorDescontoInsucesso,
   vigenciaInicio: tabelaValores.vigenciaInicio,
@@ -100,6 +101,7 @@ const valorSchema = z
     valorAdicional: dinheiroOpcional,
     valorPacoteExtra: dinheiroOpcional,
     valorParadaExtra: dinheiroOpcional,
+    valorPacoteDevolucao: dinheiroOpcional,
     valorResgate: dinheiroOpcional,
     valorDescontoInsucesso: dinheiroOpcional,
     vigenciaInicio: dataISO,
@@ -118,6 +120,14 @@ const valorSchema = z
     }
     if (v.modeloCalculo === "POR_PARADA" && v.valorParada === null) {
       ctx.addIssue({ code: "custom", path: ["valorParada"], message: "Informe o valor por parada" });
+    }
+    if (v.modeloCalculo === "DIARIA") {
+      if (v.valorRotaSemana === null) {
+        ctx.addIssue({ code: "custom", path: ["valorRotaSemana"], message: "Informe a diária (seg. a sáb.)" });
+      }
+      if (v.valorParadaExtra !== null && v.mediaPacotes === null) {
+        ctx.addIssue({ code: "custom", path: ["mediaPacotes"], message: "Informe o limite de paradas por dia (acima dele paga o excedente)" });
+      }
     }
     if (v.modeloCalculo === "ROTA_HORA") {
       if (v.duracoes.length === 0) {
